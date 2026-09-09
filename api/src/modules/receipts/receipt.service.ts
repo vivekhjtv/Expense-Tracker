@@ -361,9 +361,12 @@ export class ReceiptService {
       detail.reason === 'NOT_FOUND' ||
       /not found for API version|not supported for generateContent/i.test(raw)
     ) {
+      // Deliberately quotes Google rather than diagnosing: a 404 here can mean
+      // the model is unknown, retired, or not callable on this API version,
+      // and guessing which produced a confidently wrong message once already.
       return new ServiceUnavailableException(
-        `The model "${this.model}" is not available to this API key. Set GEMINI_MODEL to a ` +
-          'model your key can use (gemini-2.5-flash is the default).',
+        `Google rejected the model "${this.model}": ${detail.message ?? 'not found'}. ` +
+          'Check GET /api/receipts/health for models that do work.',
       );
     }
 
@@ -429,43 +432,88 @@ export class ReceiptService {
    * by reading server logs — "scanning is broken" is otherwise indisting-
    * uishable from "that photo was unreadable".
    */
-  async checkConfiguration(): Promise<{
+  async checkConfiguration(modelOverride?: string): Promise<{
     ok: boolean;
     model: string;
     message: string;
+    googleSaid?: string;
+    workingModels?: string[];
     availableModels?: string[];
     suggestion?: string;
   }> {
+    const model = modelOverride?.trim() || this.model;
+
+    const attempt = await this.tryModel(model);
+    if (attempt.ok) {
+      return { ok: true, model, message: attempt.detail };
+    }
+
+    // The configured model failed. Rather than guess why, find out what DOES
+    // work: probe a handful of candidates and report the ones that answer.
+    const availableModels = await this.listUsableModels();
+    const workingModels = await this.probe(availableModels, model);
+
+    return {
+      ok: false,
+      model,
+      message: `"${model}" did not work.`,
+      googleSaid: attempt.detail,
+      ...(availableModels.length ? { availableModels } : {}),
+      ...(workingModels.length
+        ? {
+            workingModels,
+            suggestion: `Set GEMINI_MODEL=${workingModels[0]} on your host and redeploy.`,
+          }
+        : {
+            suggestion:
+              'No model responded. That points at the API key rather than the model — ' +
+              'create a fresh one at https://aistudio.google.com/apikey.',
+          }),
+    };
+  }
+
+  /** One tiny call. Returns whether the model answered, and what it said. */
+  private async tryModel(model: string): Promise<{ ok: boolean; detail: string }> {
     try {
       const response = await this.genai.models.generateContent({
-        model: this.model,
+        model,
         contents: [{ role: 'user', parts: [{ text: 'Reply with the single word: ok' }] }],
-        config: { maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } },
+        config: { maxOutputTokens: 2000 },
       });
-
-      return {
-        ok: true,
-        model: this.model,
-        message: `Gemini responded: "${(response.text ?? '').trim().slice(0, 40)}"`,
-      };
+      return { ok: true, detail: `responded "${(response.text ?? '').trim().slice(0, 40)}"` };
     } catch (err) {
-      const mapped = this.toHttpException(err);
-
-      // "That model is unavailable" is only half an answer — the other half
-      // is which models this key CAN use. Listing them turns a dead end into
-      // a value to paste into GEMINI_MODEL.
-      const availableModels = await this.listUsableModels();
-
-      return {
-        ok: false,
-        model: this.model,
-        message: mapped.message,
-        ...(availableModels.length ? { availableModels } : {}),
-        ...(availableModels.length
-          ? { suggestion: `Set GEMINI_MODEL to one of these, e.g. "${pickBest(availableModels)}"` }
-          : {}),
-      };
+      const raw = err instanceof Error ? err.message : String(err);
+      const parsed = this.parseGeminiError(raw);
+      return { ok: false, detail: parsed.message ?? this.redact(raw) };
     }
+  }
+
+  /**
+   * Tries a few flash-family candidates in order of preference.
+   *
+   * Capped tightly: each probe is a real API call against a quota, and the
+   * first two or three working answers are all anyone needs to fix a config.
+   */
+  private async probe(available: string[], alreadyTried: string): Promise<string[]> {
+    const candidates = [
+      'gemini-flash-latest',
+      ...available.filter(
+        (m) => /flash/.test(m) && !/tts|image|lite|preview|transcribe|omni|robotics/.test(m),
+      ),
+      ...available.filter((m) => /flash/.test(m)),
+    ]
+      .filter((m, i, arr) => m !== alreadyTried && arr.indexOf(m) === i)
+      .slice(0, 6);
+
+    const working: string[] = [];
+    for (const candidate of candidates) {
+      if (working.length >= 3) break;
+      const result = await this.tryModel(candidate);
+      if (result.ok) {
+        working.push(candidate);
+      }
+    }
+    return working;
   }
 
   /** Models this API key may call generateContent on. */
@@ -494,19 +542,3 @@ export class ReceiptService {
   }
 }
 
-/** Prefers a current flash model — cheapest and fastest for OCR. */
-function pickBest(models: string[]): string {
-  const preference = [
-    (m: string) => /^gemini-[\d.]+-flash$/.test(m),
-    (m: string) => /^gemini-.*flash.*$/.test(m) && !/thinking|8b|lite/.test(m),
-    (m: string) => /^gemini-.*flash/.test(m),
-    (m: string) => /^gemini-.*pro/.test(m),
-    () => true,
-  ];
-
-  for (const matches of preference) {
-    const hit = models.find(matches);
-    if (hit) return hit;
-  }
-  return models[0];
-}

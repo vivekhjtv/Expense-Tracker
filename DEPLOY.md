@@ -121,7 +121,30 @@ curl -s https://<your-api>.onrender.com/api/receipts/health -H "authorization: B
 ```
 
 `{"ok":true,...}` means Gemini is reachable and the key is good — any scan failure after
-that is about the photo, not the setup. `{"ok":false,"message":"..."}` names the cause:
+that is about the photo, not the setup.
+
+When it fails, the response quotes Google verbatim and **probes other models** to find
+ones that actually respond:
+
+```json
+{
+  "ok": false,
+  "model": "gemini-2.5-flash",
+  "googleSaid": "models/gemini-2.5-flash is not found for API version v1beta",
+  "workingModels": ["gemini-flash-latest", "gemini-3.5-flash"],
+  "suggestion": "Set GEMINI_MODEL=gemini-flash-latest on your host and redeploy."
+}
+```
+
+Test any candidate without redeploying by passing it directly:
+
+```bash
+curl -s "https://<your-api>.onrender.com/api/receipts/health?model=gemini-flash-latest" \
+  -H "authorization: Bearer $TOKEN"
+```
+
+If `workingModels` is empty, no model responded — that points at the API key, not the
+model name. Other causes it names:
 
 | Message says | Fix |
 |---|---|

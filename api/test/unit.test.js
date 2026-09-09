@@ -144,51 +144,70 @@ const img = { buffer: Buffer.from([0xff,0xd8,0xff]), mimeType: 'image/jpeg', siz
         !leaked.includes('AIzaSyFAKEKEY1234567890abcdef'), `got="${leaked}"`);
 })();
 
-/* ---- model suggestion ------------------------------------------------ */
+/* ---- diagnostic probing ---------------------------------------------- */
 (() => {
-  console.log('\n--- model suggestion ---');
+  console.log('\n--- diagnostic probing ---');
   const cfg = {
     getOrThrow: (k) => ({ 'gemini.model': 'gemini-2.5-flash', 'gemini.thinkingBudget': 0 }[k]),
     get: () => undefined,
   };
 
-  // Simulate a key that cannot use the configured model but can use others.
-  const models = ['embedding-001', 'gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-flash-8b'];
-  const genai = {
+  const notFound = (model) => {
+    const e = new Error(JSON.stringify({ error: { code: 404, status: 'NOT_FOUND', message: `models/${model} is not found for API version v1beta` } }));
+    e.status = 404;
+    return e;
+  };
+
+  // A key where the configured model 404s but others answer — exactly the
+  // situation a stale or retired model name produces.
+  const makeGenai = (workingSet, models) => ({
     models: {
-      generateContent: async () => {
-        const e = new Error(JSON.stringify({ error: { code: 404, status: 'NOT_FOUND', message: 'models/gemini-2.5-flash is not found for API version v1beta' } }));
-        e.status = 404;
-        throw e;
+      generateContent: async ({ model }) => {
+        if (!workingSet.has(model)) throw notFound(model);
+        return { text: 'ok' };
       },
       list: async () => ({
         async *[Symbol.asyncIterator]() {
-          for (const name of models) {
-            yield { name: `models/${name}`, supportedActions: name.startsWith('embedding') ? ['embedContent'] : ['generateContent'] };
-          }
+          for (const name of models) yield { name: `models/${name}`, supportedActions: ['generateContent'] };
         },
       }),
     },
-  };
+  });
 
-  const svc = new ReceiptService(genai, cfg);
-  svc.checkConfiguration().then((result) => {
-    check('reports not-ok', result.ok === false);
-    check('names the failing model', result.message.includes('gemini-2.5-flash'));
-    check('lists what the key CAN use', JSON.stringify(result.availableModels) === JSON.stringify(['gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-flash-8b']),
-          `got=${JSON.stringify(result.availableModels)}`);
-    check('excludes embedding-only models', !result.availableModels.includes('embedding-001'));
-    check('suggests a flash model over pro', result.suggestion.includes('gemini-2.0-flash'), `got="${result.suggestion}"`);
+  const catalogue = ['gemini-2.5-flash', 'gemini-2.5-flash-preview-tts', 'gemini-flash-latest', 'gemini-3.5-flash'];
 
-    // A key that also cannot list models must still return a clear message.
-    const blind = new ReceiptService(
-      { models: { generateContent: genai.models.generateContent, list: async () => { throw new Error('denied'); } } },
-      cfg,
-    );
-    blind.checkConfiguration().then((r2) => {
-      check('survives a failed model listing', r2.ok === false && !r2.availableModels);
-      console.log(`\n${pass} passed, ${fail} failed`);
-      process.exit(fail ? 1 : 0);
+  const svc = new ReceiptService(makeGenai(new Set(['gemini-flash-latest', 'gemini-3.5-flash']), catalogue), cfg);
+  svc.checkConfiguration().then((r) => {
+    check('reports failure for the configured model', r.ok === false && r.model === 'gemini-2.5-flash');
+    check('quotes what Google actually said', (r.googleSaid || '').includes('not found'), `got="${r.googleSaid}"`);
+    check('finds models that really work', (r.workingModels || []).includes('gemini-flash-latest'), `got=${JSON.stringify(r.workingModels)}`);
+    check('never claims a working model is broken', !(r.workingModels || []).includes('gemini-2.5-flash'));
+    check('suggestion is actionable', (r.suggestion || '').startsWith('GEMINI_MODEL=') || (r.suggestion || '').includes('GEMINI_MODEL='), `got="${r.suggestion}"`);
+    check('skips tts variants when picking', !(r.workingModels || []).includes('gemini-2.5-flash-preview-tts'));
+
+    // A healthy config must short-circuit without probing anything.
+    let calls = 0;
+    const healthyGenai = makeGenai(new Set(catalogue), catalogue);
+    const inner = healthyGenai.models.generateContent;
+    healthyGenai.models.generateContent = async (a) => { calls++; return inner(a); };
+    new ReceiptService(healthyGenai, cfg).checkConfiguration().then((ok) => {
+      check('healthy config reports ok', ok.ok === true);
+      check('healthy config makes exactly one call', calls === 1, `made ${calls}`);
+
+      // Total failure must blame the key, not the model.
+      new ReceiptService(makeGenai(new Set(), catalogue), cfg).checkConfiguration().then((dead) => {
+        check('when nothing works, points at the API key', (dead.suggestion || '').includes('aistudio.google.com'), `got="${dead.suggestion}"`);
+        check('no false workingModels when nothing works', !dead.workingModels);
+
+        // An explicit ?model= override must be honoured.
+        new ReceiptService(makeGenai(new Set(['gemini-3.5-flash']), catalogue), cfg)
+          .checkConfiguration('gemini-3.5-flash')
+          .then((over) => {
+            check('honours an explicit model override', over.ok === true && over.model === 'gemini-3.5-flash');
+            console.log(`\n${pass} passed, ${fail} failed`);
+            process.exit(fail ? 1 : 0);
+          });
+      });
     });
   });
 })();

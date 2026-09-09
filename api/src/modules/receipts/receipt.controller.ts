@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Query,
   HttpCode,
   HttpStatus,
   Logger,
@@ -29,8 +30,9 @@ export class ReceiptController {
    * to expose publicly.
    */
   @Get('health')
-  checkConfiguration() {
-    return this.receiptService.checkConfiguration();
+  checkConfiguration(@Query('model') model?: string) {
+    // ?model= lets you test a candidate without redeploying to change an env var.
+    return this.receiptService.checkConfiguration(model);
   }
 
   /**
