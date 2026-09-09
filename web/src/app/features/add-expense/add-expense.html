@@ -17,16 +17,9 @@
   </a>
 </app-header>
 
-<!-- The bottom padding clears the FIXED action bar (plus the nav under it),
-     so the last card can still be scrolled clear of it. Two buttons in the
-     bar when adding, one when editing. -->
-<form
-  [formGroup]="form"
-  (ngSubmit)="submit()"
-  class="space-y-3 p-3"
-  [class.pb-14]="!isEditMode()"
-  novalidate
->
+<!-- The page's own bottom padding already clears the fixed action bar and the
+     nav under it, so the last card can still be scrolled clear of both. -->
+<form [formGroup]="form" (ngSubmit)="submit()" class="space-y-3 p-3" novalidate>
   <!-- Type selector ------------------------------------------------- -->
   <div class="rounded-xl bg-sunken p-1" role="group" aria-label="Transaction type">
     <div class="grid grid-cols-2 gap-1">
@@ -426,32 +419,42 @@
     item list gets.
   -->
   <div class="fixed inset-x-0 z-30" style="bottom: calc(4.5rem + env(safe-area-inset-bottom))">
-    <div class="surface-blur mx-auto max-w-md space-y-2 border-t border-line px-3 py-3">
-      <!-- "Add another" sits ABOVE the primary so the button that ENDS the
-           form is the lowest and last thing in the bar. It gets the same
-           shape and weight, tinted rather than filled, so the pair reads as
-           one block without the two competing. -->
-      @if (!isEditMode()) {
-        <button
-          type="button"
-          (click)="submit(true)"
-          [disabled]="saving() || isScanning()"
-          class="btn-secondary"
-        >
-          Save and add another
-        </button>
-      }
-
-      <button type="submit" [disabled]="saving() || isScanning()" class="btn-primary">
-        @if (saving()) {
-          <span
-            class="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
-          ></span>
-          Saving…
-        } @else {
-          {{ isEditMode() ? 'Update transaction' : 'Save transaction' }}
+    <!--
+      One row, so the bar costs a single button's height instead of two.
+      "Add another" leads and is tinted rather than filled: same shape and
+      weight as the primary so the pair reads as one block, but never
+      competing with the button that ends the form. Editing has no second
+      action, so the primary takes the full width there.
+    -->
+    <div class="surface-blur mx-auto max-w-md border-t border-line px-3 py-3">
+      <div class="grid gap-2" [style.grid-template-columns]="isEditMode() ? '1fr' : '1fr 1fr'">
+        @if (!isEditMode()) {
+          <button
+            type="button"
+            (click)="submit(true)"
+            [disabled]="saving() || isScanning()"
+            aria-label="Save and add another"
+            class="btn-secondary px-2 text-sm leading-tight"
+          >
+            Save &amp; add another
+          </button>
         }
-      </button>
+
+        <button
+          type="submit"
+          [disabled]="saving() || isScanning()"
+          class="btn-primary px-2 text-sm leading-tight"
+        >
+          @if (saving()) {
+            <span
+              class="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+            ></span>
+            Saving…
+          } @else {
+            {{ isEditMode() ? 'Update transaction' : 'Save transaction' }}
+          }
+        </button>
+      </div>
     </div>
   </div>
 </form>
