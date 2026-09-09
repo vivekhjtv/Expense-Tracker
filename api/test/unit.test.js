@@ -91,9 +91,6 @@ const img = { buffer: Buffer.from([0xff,0xd8,0xff]), mimeType: 'image/jpeg', siz
     await makeSvc({ isReceipt: true, totalAmount: 0, items: [], paymentMode: 'CASH', category: 'OTHER', confidence: 0.1 }).scan(img);
     eq('no amount rejected', 'no throw', 'throws 422');
   } catch (e) { eq('no-amount rejected 422', e.status, 422); }
-
-  console.log(`\n${pass} passed, ${fail} failed`);
-  process.exit(fail ? 1 : 0);
 })();
 
 /* ---- Gemini error mapping ------------------------------------------- */
@@ -145,4 +142,53 @@ const img = { buffer: Buffer.from([0xff,0xd8,0xff]), mimeType: 'image/jpeg', siz
   const leaked = map(geminiErr(400, 'INVALID_ARGUMENT', 'Bad key AIzaSyFAKEKEY1234567890abcdef supplied'));
   check('API key is redacted from error messages',
         !leaked.includes('AIzaSyFAKEKEY1234567890abcdef'), `got="${leaked}"`);
+})();
+
+/* ---- model suggestion ------------------------------------------------ */
+(() => {
+  console.log('\n--- model suggestion ---');
+  const cfg = {
+    getOrThrow: (k) => ({ 'gemini.model': 'gemini-2.5-flash', 'gemini.thinkingBudget': 0 }[k]),
+    get: () => undefined,
+  };
+
+  // Simulate a key that cannot use the configured model but can use others.
+  const models = ['embedding-001', 'gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-flash-8b'];
+  const genai = {
+    models: {
+      generateContent: async () => {
+        const e = new Error(JSON.stringify({ error: { code: 404, status: 'NOT_FOUND', message: 'models/gemini-2.5-flash is not found for API version v1beta' } }));
+        e.status = 404;
+        throw e;
+      },
+      list: async () => ({
+        async *[Symbol.asyncIterator]() {
+          for (const name of models) {
+            yield { name: `models/${name}`, supportedActions: name.startsWith('embedding') ? ['embedContent'] : ['generateContent'] };
+          }
+        },
+      }),
+    },
+  };
+
+  const svc = new ReceiptService(genai, cfg);
+  svc.checkConfiguration().then((result) => {
+    check('reports not-ok', result.ok === false);
+    check('names the failing model', result.message.includes('gemini-2.5-flash'));
+    check('lists what the key CAN use', JSON.stringify(result.availableModels) === JSON.stringify(['gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-flash-8b']),
+          `got=${JSON.stringify(result.availableModels)}`);
+    check('excludes embedding-only models', !result.availableModels.includes('embedding-001'));
+    check('suggests a flash model over pro', result.suggestion.includes('gemini-2.0-flash'), `got="${result.suggestion}"`);
+
+    // A key that also cannot list models must still return a clear message.
+    const blind = new ReceiptService(
+      { models: { generateContent: genai.models.generateContent, list: async () => { throw new Error('denied'); } } },
+      cfg,
+    );
+    blind.checkConfiguration().then((r2) => {
+      check('survives a failed model listing', r2.ok === false && !r2.availableModels);
+      console.log(`\n${pass} passed, ${fail} failed`);
+      process.exit(fail ? 1 : 0);
+    });
+  });
 })();

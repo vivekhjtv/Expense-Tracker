@@ -433,6 +433,8 @@ export class ReceiptService {
     ok: boolean;
     model: string;
     message: string;
+    availableModels?: string[];
+    suggestion?: string;
   }> {
     try {
       const response = await this.genai.models.generateContent({
@@ -448,7 +450,63 @@ export class ReceiptService {
       };
     } catch (err) {
       const mapped = this.toHttpException(err);
-      return { ok: false, model: this.model, message: mapped.message };
+
+      // "That model is unavailable" is only half an answer — the other half
+      // is which models this key CAN use. Listing them turns a dead end into
+      // a value to paste into GEMINI_MODEL.
+      const availableModels = await this.listUsableModels();
+
+      return {
+        ok: false,
+        model: this.model,
+        message: mapped.message,
+        ...(availableModels.length ? { availableModels } : {}),
+        ...(availableModels.length
+          ? { suggestion: `Set GEMINI_MODEL to one of these, e.g. "${pickBest(availableModels)}"` }
+          : {}),
+      };
     }
   }
+
+  /** Models this API key may call generateContent on. */
+  private async listUsableModels(): Promise<string[]> {
+    try {
+      const pager = await this.genai.models.list();
+      const names: string[] = [];
+
+      for await (const model of pager) {
+        // A key can expose dozens of models including embedding-only ones;
+        // cap the walk so a diagnostic never turns into a long paginated crawl.
+        if (names.length >= 40) break;
+
+        const actions = model.supportedActions;
+        const usable = !actions || actions.includes('generateContent');
+        if (usable && model.name) {
+          names.push(model.name.replace(/^models\//, ''));
+        }
+      }
+
+      return names;
+    } catch (err) {
+      this.logger.warn(`Could not list models: ${this.redact((err as Error).message)}`);
+      return [];
+    }
+  }
+}
+
+/** Prefers a current flash model — cheapest and fastest for OCR. */
+function pickBest(models: string[]): string {
+  const preference = [
+    (m: string) => /^gemini-[\d.]+-flash$/.test(m),
+    (m: string) => /^gemini-.*flash.*$/.test(m) && !/thinking|8b|lite/.test(m),
+    (m: string) => /^gemini-.*flash/.test(m),
+    (m: string) => /^gemini-.*pro/.test(m),
+    () => true,
+  ];
+
+  for (const matches of preference) {
+    const hit = models.find(matches);
+    if (hit) return hit;
+  }
+  return models[0];
 }
