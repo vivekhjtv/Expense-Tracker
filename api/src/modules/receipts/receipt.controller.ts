@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Logger,
@@ -18,6 +19,19 @@ export class ReceiptController {
   private readonly logger = new Logger(ReceiptController.name);
 
   constructor(private readonly receiptService: ReceiptService) {}
+
+  /**
+   * GET /api/receipts/health
+   *
+   * Verifies the Gemini credentials with a tiny text prompt, so a broken
+   * deployment can be diagnosed without a receipt photo or server logs.
+   * Authenticated: it reports why a key is failing, which is not something
+   * to expose publicly.
+   */
+  @Get('health')
+  checkConfiguration() {
+    return this.receiptService.checkConfiguration();
+  }
 
   /**
    * POST /api/receipts/scan   (multipart/form-data, field name: "image")

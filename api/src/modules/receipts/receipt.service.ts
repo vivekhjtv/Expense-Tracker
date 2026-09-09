@@ -303,31 +303,152 @@ export class ReceiptService {
     return Math.min(max, Math.max(min, value));
   }
 
-  /** Maps SDK/transport failures onto honest HTTP status codes for the mobile client. */
+  /**
+   * Maps SDK/transport failures onto honest HTTP status codes.
+   *
+   * The Gen AI SDK reports the real cause inside a JSON string on the error
+   * message, so it is unpacked here rather than collapsed into one generic
+   * "unavailable". A deployment that cannot scan needs to say WHY — the
+   * previous version logged the reason and told the caller nothing, which
+   * made a misconfigured key indistinguishable from a Google outage.
+   *
+   * The API key is redacted from anything that leaves this method.
+   */
   private toHttpException(err: unknown): Error {
-    const message = err instanceof Error ? err.message : String(err);
-    const status = (err as { status?: number })?.status;
+    const raw = err instanceof Error ? err.message : String(err);
+    const detail = this.parseGeminiError(raw);
+    const status = (err as { status?: number })?.status ?? detail.code;
 
-    this.logger.error(`Gemini call failed: ${message}`);
+    this.logger.error(
+      `Gemini call failed [status=${status ?? 'n/a'} reason=${detail.reason ?? 'n/a'}]: ${this.redact(raw)}`,
+    );
 
-    if (status === 429 || /quota|rate limit|RESOURCE_EXHAUSTED/i.test(message)) {
+    if (status === 429 || detail.reason === 'RESOURCE_EXHAUSTED' || /quota|rate limit/i.test(raw)) {
       return new ServiceUnavailableException(
-        'The free scanning quota is exhausted for now. Please wait a minute or enter the ' +
-          'expense manually.',
+        'The free scanning quota is used up for now. Wait a minute, or enter the expense manually.',
       );
     }
 
-    if (status === 401 || status === 403 || /API key|PERMISSION_DENIED/i.test(message)) {
-      // Never leak key details to the client; the log above has the detail.
-      return new ServiceUnavailableException('Receipt scanning is not configured correctly.');
+    if (detail.reason === 'SERVICE_DISABLED' || /has not been used in project|is disabled/i.test(raw)) {
+      return new ServiceUnavailableException(
+        'Scanning is not enabled for this API key: the Generative Language API is turned off ' +
+          'for its Google Cloud project. Enable it, or create a fresh key in Google AI Studio.',
+      );
     }
 
-    if (/timeout|ETIMEDOUT|ECONNRESET|ENOTFOUND|fetch failed/i.test(message)) {
+    if (status === 400 && /API[_ ]?key not valid|API_KEY_INVALID/i.test(raw)) {
+      return new ServiceUnavailableException(
+        'The GEMINI_API_KEY is not valid. Check it was copied in full and has no stray spaces.',
+      );
+    }
+
+    if (status === 401 || status === 403 || /PERMISSION_DENIED|API key/i.test(raw)) {
+      return new ServiceUnavailableException(
+        'The GEMINI_API_KEY was rejected. Check the key is correct and not restricted to ' +
+          'other referrers or IP addresses.',
+      );
+    }
+
+    if (/User location is not supported/i.test(raw)) {
+      return new ServiceUnavailableException(
+        'Google does not serve the Gemini API from the region this server runs in. ' +
+          'Deploy the API to a supported region.',
+      );
+    }
+
+    if (
+      status === 404 ||
+      detail.reason === 'NOT_FOUND' ||
+      /not found for API version|not supported for generateContent/i.test(raw)
+    ) {
+      return new ServiceUnavailableException(
+        `The model "${this.model}" is not available to this API key. Set GEMINI_MODEL to a ` +
+          'model your key can use (gemini-2.5-flash is the default).',
+      );
+    }
+
+    if (status === 400) {
+      return new ServiceUnavailableException(
+        `The vision request was rejected: ${detail.message ?? 'invalid request'}.`,
+      );
+    }
+
+    if (/timeout|ETIMEDOUT|ECONNRESET|ENOTFOUND|fetch failed/i.test(raw)) {
       return new ServiceUnavailableException(
         'Could not reach the scanning service. Check your connection and try again.',
       );
     }
 
-    return new ServiceUnavailableException('Receipt scanning is temporarily unavailable.');
+    return new ServiceUnavailableException(
+      `Receipt scanning failed${detail.message ? `: ${detail.message}` : ''}.`,
+    );
+  }
+
+  /** Digs the structured error out of the SDK's message string. */
+  private parseGeminiError(raw: string): {
+    code?: number;
+    reason?: string;
+    message?: string;
+  } {
+    const jsonStart = raw.indexOf('{');
+    if (jsonStart === -1) return {};
+
+    try {
+      const parsed = JSON.parse(raw.slice(jsonStart)) as {
+        error?: {
+          code?: number;
+          status?: string;
+          message?: string;
+          details?: { reason?: string }[];
+        };
+      };
+      const error = parsed.error;
+      if (!error) return {};
+
+      return {
+        code: error.code,
+        reason: error.details?.find((d) => d.reason)?.reason ?? error.status,
+        message: error.message ? this.redact(error.message) : undefined,
+      };
+    } catch {
+      return {};
+    }
+  }
+
+  /** Never let the key reach a log line or an HTTP response. */
+  private redact(text: string): string {
+    const key = this.config.get<string>('gemini.apiKey');
+    const withoutKey = key ? text.split(key).join('***') : text;
+    return withoutKey.replace(/AIza[0-9A-Za-z_-]{10,}/g, 'AIza***').slice(0, 500);
+  }
+
+  /**
+   * Confirms the Gemini credentials work, without needing a receipt photo.
+   *
+   * Exists so a broken deployment can be diagnosed from the client instead of
+   * by reading server logs — "scanning is broken" is otherwise indisting-
+   * uishable from "that photo was unreadable".
+   */
+  async checkConfiguration(): Promise<{
+    ok: boolean;
+    model: string;
+    message: string;
+  }> {
+    try {
+      const response = await this.genai.models.generateContent({
+        model: this.model,
+        contents: [{ role: 'user', parts: [{ text: 'Reply with the single word: ok' }] }],
+        config: { maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } },
+      });
+
+      return {
+        ok: true,
+        model: this.model,
+        message: `Gemini responded: "${(response.text ?? '').trim().slice(0, 40)}"`,
+      };
+    } catch (err) {
+      const mapped = this.toHttpException(err);
+      return { ok: false, model: this.model, message: mapped.message };
+    }
   }
 }

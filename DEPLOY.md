@@ -107,6 +107,35 @@ Multiple origins are comma-separated. Include a custom domain here too if you ad
 
 ---
 
+## If receipt scanning fails
+
+`GET /api/receipts/health` (needs a bearer token) makes a tiny Gemini call and reports
+in plain English whether the credentials work:
+
+```bash
+TOKEN=$(curl -s -X POST https://<your-api>.onrender.com/api/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"you@example.com","password":"..."}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
+
+curl -s https://<your-api>.onrender.com/api/receipts/health -H "authorization: Bearer $TOKEN"
+```
+
+`{"ok":true,...}` means Gemini is reachable and the key is good — any scan failure after
+that is about the photo, not the setup. `{"ok":false,"message":"..."}` names the cause:
+
+| Message says | Fix |
+|---|---|
+| GEMINI_API_KEY is not valid | Re-copy the key; check for a trailing space |
+| Generative Language API is turned off | Enable it in the key's Google Cloud project, or make a fresh key at aistudio.google.com/apikey |
+| quota is used up | Free-tier limit hit; wait, or use another key |
+| model … is not available to this API key | Set `GEMINI_MODEL` to one your key can use |
+| restricted … referrers or IP addresses | The key has restrictions that block a server call |
+| region | Google does not serve Gemini where the API is hosted |
+
+The API key is redacted from every log line and every response.
+
+---
+
 ## Things to know
 
 **Render free tier sleeps** after ~15 minutes idle. The next request takes 30–60s to

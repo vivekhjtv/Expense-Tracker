@@ -10,6 +10,10 @@ const sig = require(path + '/common/utils/image-signature.util');
 const { ReceiptService } = require(path + '/modules/receipts/receipt.service');
 
 let pass = 0, fail = 0;
+const check = (label, ok, detail = '') => {
+  ok ? pass++ : fail++;
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}` + (ok ? '' : `\n        ${detail}`));
+};
 const eq = (label, actual, expected) => {
   const ok = JSON.stringify(actual) === JSON.stringify(expected);
   ok ? pass++ : fail++;
@@ -90,4 +94,55 @@ const img = { buffer: Buffer.from([0xff,0xd8,0xff]), mimeType: 'image/jpeg', siz
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
+})();
+
+/* ---- Gemini error mapping ------------------------------------------- */
+(() => {
+  console.log('\n--- Gemini error mapping ---');
+  const cfg = {
+    getOrThrow: (k) => ({ 'gemini.model': 'gemini-2.5-flash', 'gemini.thinkingBudget': 0 }[k]),
+    get: (k) => (k === 'gemini.apiKey' ? 'AIzaSyFAKEKEY1234567890abcdef' : undefined),
+  };
+  const svc = new ReceiptService({ models: {} }, cfg);
+  const map = (err) => svc.toHttpException(err).message;
+
+  const geminiErr = (code, status, message, reason) => {
+    const e = new Error(JSON.stringify({ error: { code, status, message, ...(reason ? { details: [{ reason }] } : {}) } }));
+    e.status = code;
+    return e;
+  };
+
+  const has = (label, actual, needle) =>
+    check(label, actual.toLowerCase().includes(needle.toLowerCase()),
+          `got="${actual}"  want to contain "${needle}"`);
+
+  has('invalid API key names the key',
+    map(geminiErr(400, 'INVALID_ARGUMENT', 'API key not valid. Please pass a valid API key.')),
+    'GEMINI_API_KEY is not valid');
+  has('disabled API tells you to enable it',
+    map(geminiErr(403, 'PERMISSION_DENIED', 'Generative Language API has not been used in project 123 before', 'SERVICE_DISABLED')),
+    'Generative Language API is turned off');
+  has('quota exhausted is distinguishable',
+    map(geminiErr(429, 'RESOURCE_EXHAUSTED', 'Quota exceeded')),
+    'quota is used up');
+  has('unknown model names the model',
+    map(geminiErr(404, 'NOT_FOUND', 'models/gemini-9-ultra is not found for API version v1beta')),
+    'gemini-2.5-flash');
+  has('restricted key is explained',
+    map(geminiErr(403, 'PERMISSION_DENIED', 'Requests from referer are blocked.')),
+    'restricted');
+  has('unsupported region is explained',
+    map(geminiErr(400, 'FAILED_PRECONDITION', 'User location is not supported for the API use.')),
+    'region');
+  has('network failure is distinguishable',
+    map(new Error('fetch failed')),
+    'Could not reach');
+  has('unknown failure still says something',
+    map(new Error('something bizarre happened')),
+    'Receipt scanning failed');
+
+  // The key must never escape into a message the client receives.
+  const leaked = map(geminiErr(400, 'INVALID_ARGUMENT', 'Bad key AIzaSyFAKEKEY1234567890abcdef supplied'));
+  check('API key is redacted from error messages',
+        !leaked.includes('AIzaSyFAKEKEY1234567890abcdef'), `got="${leaked}"`);
 })();
