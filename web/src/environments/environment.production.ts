@@ -12,5 +12,5 @@
  */
 export const environment = {
   production: true,
-  apiBaseUrl: 'https://REPLACE-ME.onrender.com',
+  apiBaseUrl: 'https://expense-tracker-41z3.onrender.com',
 };
