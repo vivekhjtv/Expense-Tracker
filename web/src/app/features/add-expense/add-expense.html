@@ -1,0 +1,426 @@
+<!--
+  Add / Edit transaction.
+
+  Order follows how someone actually enters a spend on a phone: scan or type
+  the amount first (the one field that is always needed), then the details.
+  Every control is at least 44px tall and reachable one-handed.
+-->
+
+<!-- Header ---------------------------------------------------------- -->
+<header
+  class="sticky top-0 z-30 border-b border-ink-200 bg-white/95 px-4 py-3 backdrop-blur-sm"
+  style="padding-top: max(0.75rem, env(safe-area-inset-top))"
+>
+  <div class="flex items-center justify-between gap-3">
+    <a
+      routerLink="/"
+      aria-label="Go back"
+      class="tap -ml-2 flex size-10 items-center justify-center rounded-full text-ink-500 active:bg-ink-100"
+    >
+      <span aria-hidden="true" class="text-xl">&#8592;</span>
+    </a>
+    <h1 class="text-base font-semibold text-ink-900">
+      {{ isEditMode() ? 'Edit Transaction' : 'Add Transaction' }}
+    </h1>
+    <div class="w-10" aria-hidden="true"></div>
+  </div>
+</header>
+
+<form [formGroup]="form" (ngSubmit)="submit()" class="space-y-3 p-3" novalidate>
+  <!-- Type selector ------------------------------------------------- -->
+  <div class="card p-1" role="group" aria-label="Transaction type">
+    <div class="grid grid-cols-2 gap-1">
+      @for (option of [
+        { value: TransactionType.EXPENSE, label: 'Expense', active: 'bg-spend-600 text-white' },
+        { value: TransactionType.INCOME,  label: 'Income',  active: 'bg-earn-600 text-white' }
+      ]; track option.value) {
+        <button
+          type="button"
+          (click)="setType(option.value)"
+          [attr.aria-pressed]="type() === option.value"
+          class="tap rounded-xl px-2 text-sm font-semibold transition-colors"
+          [class]="type() === option.value ? option.active : 'text-ink-500 active:bg-ink-100'"
+        >
+          {{ option.label }}
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- AI receipt scanner -------------------------------------------- -->
+  @if (!isIncome()) {
+    <div class="card overflow-hidden">
+      <!--
+        `capture="environment"` asks the phone to open the REAR camera
+        directly. Browsers that ignore it fall back to the normal file
+        picker, so an upload from the gallery keeps working either way.
+      -->
+      <input
+        #fileInput
+        type="file"
+        accept="image/*"
+        capture="environment"
+        class="hidden"
+        (change)="onFileSelected($event)"
+      />
+
+      <button
+        type="button"
+        (click)="fileInput.click()"
+        [disabled]="isScanning()"
+        class="tap flex w-full items-center gap-3 p-4 text-left transition active:bg-brand-50 disabled:opacity-60"
+      >
+        <span
+          class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-xl"
+          aria-hidden="true"
+        >📷</span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-semibold text-ink-900">Scan a receipt</span>
+          <span class="block text-xs text-ink-500">
+            Snap the bill and we will fill this in for you
+          </span>
+        </span>
+        @if (isScanning()) {
+          <span class="size-5 shrink-0 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600"></span>
+        } @else {
+          <span class="shrink-0 text-ink-300" aria-hidden="true">&#8250;</span>
+        }
+      </button>
+
+      <!-- Two-phase progress: a weak connection makes the upload itself
+           slow, and a single spinner across both stages looks frozen. -->
+      @if (scanState(); as state) {
+        @if (state.phase !== 'idle') {
+          <div class="border-t border-ink-100 bg-brand-50/60 px-4 py-3">
+            @if (state.phase === 'uploading') {
+              <p class="mb-2 text-xs font-medium text-brand-700">
+                Uploading photo… {{ state.percent }}%
+              </p>
+              <div class="h-1.5 overflow-hidden rounded-full bg-brand-100">
+                <div
+                  class="h-full rounded-full bg-brand-600 transition-all duration-200"
+                  [style.width.%]="state.percent"
+                ></div>
+              </div>
+            } @else {
+              <p class="flex items-center gap-2 text-xs font-medium text-brand-700">
+                <span class="size-3 animate-spin rounded-full border-2 border-brand-300 border-t-brand-700"></span>
+                Reading the bill…
+              </p>
+            }
+          </div>
+        }
+      }
+
+      @if (scanConfidence() !== null) {
+        <div class="border-t border-ink-100 px-4 py-2.5">
+          <p class="text-[11px] font-medium text-ink-500">
+            Scanned with {{ (scanConfidence()! * 100).toFixed(0) }}% confidence — check the amount
+            and items before saving.
+          </p>
+        </div>
+      }
+
+      @for (warning of scanWarnings(); track warning) {
+        <p class="border-t border-amber-100 bg-amber-50 px-4 py-2.5 text-[11px] leading-relaxed text-amber-800">
+          <span aria-hidden="true">&#9888;</span> {{ warning }}
+        </p>
+      }
+    </div>
+  }
+
+  <!-- Amount --------------------------------------------------------- -->
+  <div class="card p-4">
+    <label for="amount" class="label">Amount</label>
+    <div class="flex items-baseline gap-2">
+      <span class="text-2xl font-semibold text-ink-400" aria-hidden="true">&#8377;</span>
+      <!--
+        inputmode="decimal" gives the numeric keypad on mobile while still
+        allowing a decimal point, which type="number" alone does not
+        reliably do across Android keyboards.
+      -->
+      <input
+        id="amount"
+        type="number"
+        formControlName="amount"
+        inputmode="decimal"
+        step="0.01"
+        min="0.01"
+        placeholder="0.00"
+        autocomplete="off"
+        [attr.data-invalid]="showError('amount')"
+        [attr.aria-invalid]="showError('amount')"
+        aria-describedby="amount-error"
+        class="w-full border-0 bg-transparent p-0 text-4xl font-bold tracking-tight
+               text-ink-900 outline-none placeholder:text-ink-300"
+        [class.text-spend-600]="showError('amount')"
+      />
+    </div>
+
+    @if (showError('amount')) {
+      <p id="amount-error" class="mt-2 text-xs font-medium text-spend-600">
+        @if (form.controls.amount.hasError('required')) {
+          Enter how much it was.
+        } @else if (form.controls.amount.hasError('min')) {
+          The amount must be more than &#8377;0.
+        } @else {
+          That amount is too large.
+        }
+      </p>
+    }
+
+    @if (itemsMismatch(); as mismatch) {
+      <button
+        type="button"
+        (click)="useItemsTotal()"
+        class="tap mt-3 flex w-full items-center justify-between rounded-xl bg-amber-50 px-3 py-2 text-left ring-1 ring-amber-200"
+      >
+        <span class="text-[11px] leading-snug text-amber-800">
+          Items add up to <strong>{{ mismatch.total | inr }}</strong>
+          ({{ mismatch.diff > 0 ? '+' : '' }}{{ mismatch.diff | inr }} vs the amount).
+        </span>
+        <span class="ml-2 shrink-0 text-[11px] font-bold text-amber-900 underline">Use it</span>
+      </button>
+    }
+  </div>
+
+  <!-- Payment mode --------------------------------------------------- -->
+  <div class="card p-4">
+    <span class="label" id="payment-mode-label">Payment mode</span>
+    <div class="grid grid-cols-2 gap-2" role="group" aria-labelledby="payment-mode-label">
+      <button
+        type="button"
+        (click)="setPaymentMode(PaymentMode.CASH)"
+        [attr.aria-pressed]="form.controls.paymentMode.value === PaymentMode.CASH"
+        class="tap flex items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold ring-1 transition disabled:opacity-40"
+        [class]="
+          form.controls.paymentMode.value === PaymentMode.CASH
+            ? 'bg-earn-50 text-earn-700 ring-earn-600'
+            : 'bg-white text-ink-500 ring-ink-200'
+        "
+      >
+        <span aria-hidden="true">💵</span> Cash
+      </button>
+      <button
+        type="button"
+        (click)="setPaymentMode(PaymentMode.ONLINE_BANKING)"
+        [attr.aria-pressed]="form.controls.paymentMode.value === PaymentMode.ONLINE_BANKING"
+        class="tap flex items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold ring-1 transition"
+        [class]="
+          form.controls.paymentMode.value === PaymentMode.ONLINE_BANKING
+            ? 'bg-brand-50 text-brand-700 ring-brand-600'
+            : 'bg-white text-ink-500 ring-ink-200'
+        "
+      >
+        <span aria-hidden="true">📱</span> UPI / Card
+      </button>
+    </div>
+  </div>
+
+  <!-- Category ------------------------------------------------------- -->
+  <div class="card p-4">
+      <span class="label" id="category-label">Category</span>
+      <!-- A wrapping chip grid rather than a <select>: it shows every option
+           at once and each chip is its own large tap target. -->
+      <div class="flex flex-wrap gap-2" role="group" aria-labelledby="category-label">
+        @for (option of categories(); track option.value) {
+          <button
+            type="button"
+            (click)="setCategory(option.value)"
+            [attr.aria-pressed]="form.controls.category.value === option.value"
+            class="tap flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold ring-1 transition"
+            [class]="
+              form.controls.category.value === option.value
+                ? 'bg-brand-600 text-white ring-brand-600'
+                : 'bg-white text-ink-600 ring-ink-200 active:bg-ink-100'
+            "
+          >
+            <span aria-hidden="true">{{ option.icon }}</span>{{ option.label }}
+          </button>
+        }
+      </div>
+  </div>
+
+  <!-- Date, merchant, notes ------------------------------------------ -->
+  <div class="card space-y-3 p-4">
+    <div>
+      <label for="date" class="label">Date</label>
+      <div class="relative">
+        <input
+          id="date"
+          type="date"
+          formControlName="date"
+          [attr.data-invalid]="showError('date')"
+          class="field tap"
+          [class.field-error]="showError('date')"
+        />
+      </div>
+      @if (dateIsFuture()) {
+        <p class="mt-1.5 text-xs font-medium text-amber-700">
+          That date is in the future — double-check it.
+        </p>
+      }
+    </div>
+
+    <div>
+      <label for="merchantName" class="label">Merchant <span class="font-normal normal-case text-ink-400">(optional)</span></label>
+      <input
+        id="merchantName"
+        type="text"
+        formControlName="merchantName"
+        placeholder="DMart, Swiggy, Uber…"
+        autocomplete="off"
+        enterkeyhint="next"
+        class="field"
+      />
+    </div>
+
+    <div>
+      <label for="notes" class="label">Notes <span class="font-normal normal-case text-ink-400">(optional)</span></label>
+      <textarea
+        id="notes"
+        formControlName="notes"
+        rows="2"
+        placeholder="Anything worth remembering"
+        class="field resize-none"
+      ></textarea>
+    </div>
+  </div>
+
+  <!-- Line items (dynamic FormArray) --------------------------------- -->
+  <div class="card p-4" formArrayName="items">
+    <div class="mb-3 flex items-center justify-between">
+      <div>
+        <span class="label mb-0">Items</span>
+        @if (items.length) {
+          <p class="mt-0.5 text-[11px] text-ink-500">
+            {{ items.length }} item{{ items.length === 1 ? '' : 's' }} ·
+            <strong class="text-ink-700">{{ itemsTotal() | inr }}</strong>
+          </p>
+        }
+      </div>
+      @if (items.length) {
+        <button
+          type="button"
+          (click)="clearItems()"
+          class="tap px-2 text-xs font-semibold text-ink-400 active:text-spend-600"
+        >
+          Clear all
+        </button>
+      }
+    </div>
+
+    @if (items.length === 0) {
+      <p class="mb-3 text-xs leading-relaxed text-ink-400">
+        Break the bill into individual products. Scan a receipt above to fill these in
+        automatically, or add them by hand.
+      </p>
+    }
+
+    <div class="space-y-2">
+      @for (group of items.controls; track group; let i = $index) {
+        <div [formGroupName]="i" class="rounded-xl bg-ink-50 p-3 ring-1 ring-ink-200">
+          <div class="flex items-start gap-2">
+            <input
+              type="text"
+              formControlName="name"
+              placeholder="Item name"
+              [attr.aria-label]="'Item ' + (i + 1) + ' name'"
+              [attr.data-invalid]="group.controls.name.invalid && group.controls.name.touched"
+              class="field flex-1 bg-white py-2 text-sm"
+              [class.field-error]="group.controls.name.invalid && group.controls.name.touched"
+            />
+            <button
+              type="button"
+              (click)="removeItem(i)"
+              [attr.aria-label]="'Remove item ' + (i + 1)"
+              class="tap flex size-10 shrink-0 items-center justify-center rounded-lg text-ink-400 active:bg-spend-50 active:text-spend-600"
+            >
+              <span aria-hidden="true" class="text-lg">&#215;</span>
+            </button>
+          </div>
+
+          <div class="mt-2 grid grid-cols-[1fr_4.5rem_auto] items-center gap-2">
+            <label class="sr-only" [attr.for]="'price-' + i">Unit price</label>
+            <div class="relative">
+              <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-400" aria-hidden="true">&#8377;</span>
+              <input
+                [id]="'price-' + i"
+                type="number"
+                formControlName="price"
+                inputmode="decimal"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                class="field bg-white py-2 pl-7 text-sm"
+              />
+            </div>
+
+            <label class="sr-only" [attr.for]="'qty-' + i">Quantity</label>
+            <div class="relative">
+              <span class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-ink-400" aria-hidden="true">&#215;</span>
+              <input
+                [id]="'qty-' + i"
+                type="number"
+                formControlName="qty"
+                inputmode="decimal"
+                step="1"
+                min="0.001"
+                class="field bg-white px-2 py-2 pl-6 text-center text-sm"
+              />
+            </div>
+
+            <span class="min-w-16 text-right text-sm font-semibold text-ink-700">
+              {{ lineTotal(group) | inr }}
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+
+    <button
+      type="button"
+      (click)="addItem()"
+      class="tap mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed
+             border-ink-300 py-3 text-sm font-semibold text-ink-500 active:bg-ink-100"
+    >
+      <span aria-hidden="true">+</span> Add item
+    </button>
+  </div>
+
+  <!-- Submit ---------------------------------------------------------- -->
+  <!--
+    Sticky above the bottom nav so Save is always in thumb reach, however
+    long the item list gets.
+  -->
+  <div
+    class="sticky z-30 -mx-3 mt-4 border-t border-ink-200 bg-white/95 px-3 py-3 backdrop-blur-sm"
+    style="bottom: calc(4.5rem + env(safe-area-inset-bottom))"
+  >
+    <button
+      type="submit"
+      [disabled]="saving() || isScanning()"
+      class="tap flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3.5
+             text-base font-semibold text-white shadow-sm transition
+             active:scale-[0.99] active:bg-brand-700 disabled:opacity-60"
+    >
+      @if (saving()) {
+        <span class="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+        Saving…
+      } @else {
+        {{ isEditMode() ? 'Update transaction' : 'Save transaction' }}
+      }
+    </button>
+
+    @if (!isEditMode()) {
+      <button
+        type="button"
+        (click)="submit(true)"
+        [disabled]="saving() || isScanning()"
+        class="tap mt-1 w-full py-2 text-xs font-semibold text-ink-500 active:text-brand-600 disabled:opacity-60"
+      >
+        Save and add another
+      </button>
+    }
+  </div>
+</form>

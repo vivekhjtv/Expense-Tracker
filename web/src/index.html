@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Expense Tracker</title>
+    <base href="/" />
+
+    <!--
+      viewport-fit=cover lets the app paint under the iPhone home indicator;
+      the bottom nav then adds env(safe-area-inset-bottom) padding itself.
+      maximum-scale is deliberately NOT set — locking zoom breaks
+      accessibility for anyone who needs to magnify the screen.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="description" content="Track daily spending across cash, bank and UPI accounts." />
+
+    <!-- Lets the app run fullscreen when added to the iOS home screen. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+    <link rel="icon" href="favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <app-root></app-root>
+  </body>
+</html>

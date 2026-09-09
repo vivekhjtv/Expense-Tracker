@@ -1,0 +1,25 @@
+# Render blueprint. Point Render at this repo and it picks this up, or create
+# the service by hand with the same settings.
+services:
+  - type: web
+    name: expense-tracker-api
+    runtime: node
+    plan: free
+    rootDir: api
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render injects PORT; main.ts already reads it.
+      - key: MONGODB_URI
+        sync: false      # set in the Render dashboard, never in the repo
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true   # Render generates a strong secret once
+      - key: CORS_ORIGINS
+        sync: false      # your Vercel URL, e.g. https://your-app.vercel.app
+      - key: MAX_UPLOAD_SIZE_MB
+        value: "10"

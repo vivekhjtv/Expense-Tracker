@@ -1,0 +1,120 @@
+@import 'tailwindcss';
+
+/**
+ * Design tokens.
+ *
+ * The palette is built around a single indigo accent with semantic red/green
+ * for money direction, because on a spending screen colour has to mean one
+ * thing only: red is money out, green is money in. Everything else stays
+ * neutral so those two never have to compete for attention.
+ */
+@theme {
+  --color-ink-50: #f8fafc;
+  --color-ink-100: #f1f5f9;
+  --color-ink-200: #e2e8f0;
+  --color-ink-300: #cbd5e1;
+  --color-ink-400: #94a3b8;
+  --color-ink-500: #64748b;
+  --color-ink-600: #475569;
+  --color-ink-700: #334155;
+  --color-ink-800: #1e293b;
+  --color-ink-900: #0f172a;
+
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+
+  --color-spend-50: #fef2f2;
+  --color-spend-100: #fee2e2;
+  --color-spend-600: #dc2626;
+  --color-spend-700: #b91c1c;
+
+  --color-earn-50: #f0fdf4;
+  --color-earn-100: #dcfce7;
+  --color-earn-600: #16a34a;
+  --color-earn-700: #15803d;
+
+  --color-move-50: #eff6ff;
+  --color-move-100: #dbeafe;
+  --color-move-600: #2563eb;
+
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ------------------------------------------------------------------ */
+/* Base                                                                */
+/* ------------------------------------------------------------------ */
+
+html {
+  /* Stops iOS Safari zooming the whole page when a text input is focused. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-ink-100 text-ink-900 font-sans antialiased;
+  /* Kills the grey flash on every tap in mobile Safari/Chrome. */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Number inputs: hide the desktop spinners, which are unusable on touch
+   and visually noisy next to a currency symbol. */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* The native date picker indicator is tiny; widen its hit area to the
+   whole field so the control meets a touch target size. */
+input[type='date']::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Component primitives                                                */
+/* ------------------------------------------------------------------ */
+
+@utility card {
+  @apply rounded-2xl bg-white shadow-sm ring-1 ring-ink-200/70;
+}
+
+/* 44px minimum — the smallest reliably tappable target on a phone. */
+@utility tap {
+  @apply min-h-11 touch-manipulation select-none;
+}
+
+@utility field {
+  @apply w-full rounded-xl border-0 bg-ink-100 px-4 py-3 text-base text-ink-900
+         ring-1 ring-inset ring-ink-200 outline-none transition
+         placeholder:text-ink-400
+         focus:bg-white focus:ring-2 focus:ring-brand-500;
+}
+
+@utility field-error {
+  @apply ring-spend-600 focus:ring-spend-600;
+}
+
+@utility label {
+  @apply mb-1.5 block text-xs font-semibold tracking-wide text-ink-500 uppercase;
+}

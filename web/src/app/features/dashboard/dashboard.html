@@ -1,0 +1,121 @@
+<header
+  class="sticky top-0 z-30 border-b border-ink-200 bg-white/95 px-4 py-3 backdrop-blur-sm"
+  style="padding-top: max(0.75rem, env(safe-area-inset-top))"
+>
+  <h1 class="text-base font-semibold text-ink-900">Dashboard</h1>
+</header>
+
+<div class="space-y-3 p-3">
+  <!-- Range filter, one row above the charts. -->
+  <div class="flex gap-1.5 overflow-x-auto pb-0.5" role="group" aria-label="Date range">
+    @for (option of ranges; track option.value) {
+      <button
+        type="button"
+        (click)="setRange(option.value)"
+        [attr.aria-pressed]="range() === option.value"
+        class="tap shrink-0 rounded-full px-4 text-xs font-semibold ring-1 transition"
+        [class]="
+          range() === option.value
+            ? 'bg-ink-900 text-white ring-ink-900'
+            : 'bg-white text-ink-500 ring-ink-200'
+        "
+      >
+        {{ option.label }}
+      </button>
+    }
+  </div>
+
+  @if (failed()) {
+    <div class="card p-6 text-center">
+      <p class="text-sm text-ink-500">Could not load your dashboard.</p>
+    </div>
+  } @else if (loading()) {
+    <!-- Skeletons match the real card heights so nothing jumps on arrival. -->
+    <div class="card h-24 animate-pulse bg-ink-100"></div>
+    <div class="card h-44 animate-pulse bg-ink-100"></div>
+    <div class="card h-64 animate-pulse bg-ink-100"></div>
+  } @else if (summary(); as stats) {
+    <!-- Hero figure: total spend is the one number this screen leads with. -->
+    <section class="card p-4" aria-labelledby="spend-label">
+      <p id="spend-label" class="label mb-1">Spent this {{ rangeLabel().toLowerCase() }}</p>
+      <p class="text-4xl font-bold tracking-tight text-ink-900">
+        {{ stats.totalSpend | inr: false }}
+      </p>
+      <p class="mt-1 text-xs text-ink-500">
+        {{ stats.transactionCount }} transaction{{ stats.transactionCount === 1 ? '' : 's' }}
+        @if (stats.averageDailySpend > 0) {
+          · {{ stats.averageDailySpend | inr: false }}/day
+        }
+      </p>
+    </section>
+
+    <!-- Metric tiles ------------------------------------------------- -->
+    <section class="grid grid-cols-2 gap-3">
+      <div class="card p-3.5">
+        <p class="label mb-1">Biggest single spend</p>
+        <p class="text-xl font-bold tracking-tight text-spend-600">
+          {{ stats.largestSpend | inr: false }}
+        </p>
+      </div>
+
+      <div class="card p-3.5">
+        <p class="label mb-1">Received</p>
+        <p class="text-xl font-bold tracking-tight text-earn-600">
+          {{ stats.totalIncome | inr: false }}
+        </p>
+      </div>
+    </section>
+
+    @if (topCategoryLabel(); as top) {
+      <section class="card flex items-center gap-3 p-3.5">
+        <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-ink-100 text-lg" aria-hidden="true">
+          {{ top.icon }}
+        </span>
+        <div class="min-w-0 flex-1">
+          <p class="text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Biggest category</p>
+          <p class="truncate text-sm font-semibold text-ink-900">{{ top.label }}</p>
+        </div>
+        <p class="shrink-0 text-sm font-bold text-ink-900">
+          {{ summary()!.topCategory!.total | inr: false }}
+        </p>
+      </section>
+    }
+
+    @if (hasSpend()) {
+      <!-- Daily trend ------------------------------------------------ -->
+      <section class="card p-4" aria-labelledby="trend-title">
+        <h2 id="trend-title" class="mb-1 text-sm font-semibold text-ink-900">Daily spending</h2>
+        <p class="mb-2 text-[11px] text-ink-400">Tap a bar for that day's total</p>
+        <app-trend-bars [points]="dailyTrend()" />
+      </section>
+
+      <!-- Category breakdown ---------------------------------------- -->
+      <section class="card p-4" aria-labelledby="category-title">
+        <h2 id="category-title" class="mb-3 text-sm font-semibold text-ink-900">Where it went</h2>
+        <app-category-donut [slices]="categories()" />
+      </section>
+
+      <!-- Cash vs online -------------------------------------------- -->
+      <section class="card p-4" aria-labelledby="split-title">
+        <h2 id="split-title" class="mb-3 text-sm font-semibold text-ink-900">Cash vs online</h2>
+        <app-split-bar [slices]="paymentModes()" />
+      </section>
+    } @else {
+      <section class="card flex flex-col items-center gap-2 p-8 text-center">
+        <span class="text-3xl" aria-hidden="true">🌱</span>
+        <p class="text-sm font-semibold text-ink-700">Nothing recorded this {{ rangeLabel().toLowerCase() }}</p>
+        <p class="text-xs text-ink-500">Add a transaction and your charts will fill in.</p>
+        <a routerLink="/add" class="tap mt-1 flex items-center rounded-xl bg-brand-600 px-5 text-sm font-semibold text-white">
+          Add a transaction
+        </a>
+      </section>
+    }
+
+    <a
+      routerLink="/ledger"
+      class="tap flex items-center justify-center rounded-xl bg-white py-3 text-sm font-semibold text-brand-600 ring-1 ring-ink-200"
+    >
+      View full ledger
+    </a>
+  }
+</div>
