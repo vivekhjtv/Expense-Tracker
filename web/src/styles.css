@@ -342,6 +342,25 @@ input[type='date']::-webkit-calendar-picker-indicator {
   box-shadow: none;
 }
 
+/* The second action in a pair. Same shape, size and weight as .btn-primary so
+   the two read as one block of actions rather than a button with an
+   afterthought under it — but a tinted wash instead of a solid fill, so which
+   one is the primary is never in doubt. */
+@utility btn-secondary {
+  @apply tap flex w-full items-center justify-center gap-2 rounded-xl py-3.5
+         text-base font-semibold transition;
+  background-color: var(--color-accent-soft);
+  border: 1px solid color-mix(in oklab, var(--color-accent) 35%, transparent);
+  color: var(--color-accent-fg);
+}
+.btn-secondary:active {
+  transform: scale(0.99);
+  background-color: color-mix(in oklab, var(--color-accent) 20%, var(--color-accent-soft));
+}
+.btn-secondary:disabled {
+  opacity: 0.6;
+}
+
 @utility btn-quiet {
   @apply tap flex items-center justify-center gap-2 rounded-xl py-3
          text-sm font-semibold transition;
