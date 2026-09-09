@@ -2,14 +2,30 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { catchError, combineLatest, debounceTime, distinctUntilChanged, map, of, startWith, switchMap } from 'rxjs';
-import { categoryMeta, DateRangePreset, PaymentMode, TransactionType } from '../../core/models/enums';
+import {
+  catchError,
+  combineLatest,
+  debounceTime,
+  distinctUntilChanged,
+  map,
+  of,
+  startWith,
+  switchMap,
+} from 'rxjs';
+import {
+  categoryMeta,
+  DateRangePreset,
+  PaymentMode,
+  TransactionType,
+} from '../../core/models/enums';
 import { Paginated, Transaction } from '../../core/models/transaction.model';
 import { ToastService } from '../../core/services/toast.service';
 import { TransactionQuery, TransactionService } from '../../core/services/transaction.service';
 import { EXPENSE_CATEGORIES } from '../../core/models/enums';
 import { toIsoFromDateInput } from '../../core/utils/date.util';
 import { InrPipe } from '../../shared/pipes/inr.pipe';
+import { AppHeader } from '../../shared/components/app-header/app-header';
+import { Icon } from '../../shared/components/icon/icon';
 
 interface DayGroup {
   date: string;
@@ -30,7 +46,7 @@ const RANGES = [
 
 @Component({
   selector: 'app-ledger',
-  imports: [ReactiveFormsModule, RouterLink, InrPipe],
+  imports: [ReactiveFormsModule, RouterLink, InrPipe, AppHeader, Icon],
   templateUrl: './ledger.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -89,10 +105,12 @@ export class Ledger {
     }),
     // Suppresses the echo when only the search box changed.
     distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
-    startWith((() => {
-      const { search: _search, ...rest } = this.filters.getRawValue();
-      return rest;
-    })()),
+    startWith(
+      (() => {
+        const { search: _search, ...rest } = this.filters.getRawValue();
+        return rest;
+      })(),
+    ),
   );
 
   private readonly result = toSignal(
@@ -183,7 +201,11 @@ export class Ledger {
   protected resetFilters(): void {
     this.filters.reset({
       range: DateRangePreset.THIS_MONTH,
-      from: '', to: '', paymentMode: '', category: '', search: '',
+      from: '',
+      to: '',
+      paymentMode: '',
+      category: '',
+      search: '',
     });
     this.page.set(1);
   }
@@ -225,9 +247,10 @@ export class Ledger {
   }
 
   protected itemsTotal(tx: Transaction): number {
-    return Math.round(
-      (tx.items ?? []).reduce((sum, i) => sum + Math.round(i.price * 100) * i.qty, 0),
-    ) / 100;
+    return (
+      Math.round((tx.items ?? []).reduce((sum, i) => sum + Math.round(i.price * 100) * i.qty, 0)) /
+      100
+    );
   }
 
   protected time(iso: string): string {
@@ -252,7 +275,10 @@ export class Ledger {
     });
   }
 
-  private toQuery(filters: ReturnType<typeof this.filters.getRawValue>, page: number): TransactionQuery {
+  private toQuery(
+    filters: ReturnType<typeof this.filters.getRawValue>,
+    page: number,
+  ): TransactionQuery {
     const isCustom = filters.range === DateRangePreset.CUSTOM;
     return {
       range: filters.range,

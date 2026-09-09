@@ -43,19 +43,21 @@ import { InrPipe } from '../../pipes/inr.pipe';
                   [style.background-color]="part.color"
                   aria-hidden="true"
                 ></span>
-                <span class="text-xs font-medium text-ink-500">{{ part.label }}</span>
+                <span class="text-xs font-medium text-fg-muted">{{ part.label }}</span>
               </div>
-              <p class="mt-0.5 text-lg font-bold tracking-tight text-ink-900">
+              <p class="mt-0.5 text-lg font-bold tracking-tight text-fg">
                 {{ part.slice.total | inr: false }}
               </p>
-              <p class="text-[11px] text-ink-400">
-                {{ part.pct.toFixed(0) }}% · {{ part.slice.count }} txn{{ part.slice.count === 1 ? '' : 's' }}
+              <p class="text-[11px] text-fg-subtle">
+                {{ part.pct.toFixed(0) }}% · {{ part.slice.count }} txn{{
+                  part.slice.count === 1 ? '' : 's'
+                }}
               </p>
             </div>
           }
         </div>
       } @else {
-        <p class="py-4 text-center text-sm text-ink-400">No spending in this period.</p>
+        <p class="py-4 text-center text-sm text-fg-subtle">No spending in this period.</p>
       }
     </figure>
   `,
@@ -63,9 +65,7 @@ import { InrPipe } from '../../pipes/inr.pipe';
 export class SplitBar {
   readonly slices = input.required<PaymentModeSlice[]>();
 
-  protected readonly total = computed(() =>
-    this.slices().reduce((sum, s) => sum + s.total, 0),
-  );
+  protected readonly total = computed(() => this.slices().reduce((sum, s) => sum + s.total, 0));
 
   protected readonly parts = computed(() => {
     const total = this.total();

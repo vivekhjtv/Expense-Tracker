@@ -3,12 +3,35 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiError } from '../../core/interceptors/error.interceptor';
 import { AuthService } from '../../core/services/auth.service';
+import { ThemeToggle } from '../../shared/components/theme/theme-toggle';
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ThemeToggle],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './login.html',
+  styles: `
+    /* The wordmark and the bloom are the only two gradients in the app. They
+       live here rather than in a utility because nothing else should use
+       them — a gradient that appears twice stops being an identity. */
+    .mark {
+      background-image: linear-gradient(
+        140deg,
+        color-mix(in oklab, var(--color-accent) 82%, white),
+        var(--color-accent)
+      );
+      box-shadow: 0 10px 30px -8px color-mix(in oklab, var(--color-accent) 65%, transparent);
+    }
+
+    .glow {
+      background: radial-gradient(
+        circle,
+        color-mix(in oklab, var(--color-accent) 22%, transparent),
+        transparent 68%
+      );
+      filter: blur(24px);
+    }
+  `,
 })
 export class Login {
   private readonly fb = inject(FormBuilder);

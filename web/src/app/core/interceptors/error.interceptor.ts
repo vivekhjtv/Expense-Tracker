@@ -67,10 +67,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 function toApiError(error: HttpErrorResponse): ApiError {
   // status 0 = the request never reached the server.
   if (error.status === 0) {
-    return new ApiError(
-      'Cannot reach the server. Check your connection and try again.',
-      0,
-    );
+    return new ApiError('Cannot reach the server. Check your connection and try again.', 0);
   }
 
   const body = error.error as ApiErrorBody | string | null;

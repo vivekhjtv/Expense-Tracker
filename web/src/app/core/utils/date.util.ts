@@ -38,9 +38,7 @@ export function toIsoFromDateInput(dateInputValue: string): string {
   const isToday =
     now.getFullYear() === year && now.getMonth() + 1 === month && now.getDate() === day;
 
-  const local = isToday
-    ? now
-    : new Date(year, month - 1, day, 12, 0, 0, 0);
+  const local = isToday ? now : new Date(year, month - 1, day, 12, 0, 0, 0);
 
   return local.toISOString();
 }

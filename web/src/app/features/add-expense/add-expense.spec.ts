@@ -13,7 +13,10 @@ const receipt = (over: Partial<ScannedReceipt> = {}): ScannedReceipt => ({
   merchantName: 'Reliance Fresh',
   date: '2026-09-05T12:00:00.000Z',
   totalAmount: 379.58,
-  subTotal: 361.5, taxAmount: 18.08, discountAmount: null, currency: 'INR',
+  subTotal: 361.5,
+  taxAmount: 18.08,
+  discountAmount: null,
+  currency: 'INR',
   paymentMode: PaymentMode.ONLINE_BANKING,
   category: 'GROCERIES',
   notes: null,
@@ -30,7 +33,11 @@ const receipt = (over: Partial<ScannedReceipt> = {}): ScannedReceipt => ({
 describe('AddExpense', () => {
   let fixture: ComponentFixture<AddExpense>;
   let component: any;
-  let transactionService: { create: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> };
+  let transactionService: {
+    create: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     transactionService = {
@@ -45,7 +52,10 @@ describe('AddExpense', () => {
         provideZonelessChangeDetection(),
         provideRouter([]),
         { provide: TransactionService, useValue: transactionService },
-        { provide: ReceiptService, useValue: { scan: () => of({ phase: 'done', receipt: receipt() }) } },
+        {
+          provide: ReceiptService,
+          useValue: { scan: () => of({ phase: 'done', receipt: receipt() }) },
+        },
       ],
     }).compileComponents();
 
@@ -82,8 +92,6 @@ describe('AddExpense', () => {
     });
   });
 
-
-
   describe('patchFromScan', () => {
     it('hydrates scalar fields from the scan', () => {
       component.patchFromScan(receipt());
@@ -99,7 +107,9 @@ describe('AddExpense', () => {
       component.patchFromScan(receipt());
       expect(component.items.length).toBe(2);
       expect(component.items.at(0).getRawValue()).toEqual({
-        name: 'Amul Gold Milk 1L', price: 34, qty: 2,
+        name: 'Amul Gold Milk 1L',
+        price: 34,
+        qty: 2,
       });
     });
 
@@ -157,7 +167,10 @@ describe('AddExpense', () => {
       component.submit();
       const payload = transactionService.create.mock.calls[0][0];
       expect(payload).toMatchObject({
-        amount: 250, type: 'EXPENSE', category: 'FUEL', paymentMode: 'CASH',
+        amount: 250,
+        type: 'EXPENSE',
+        category: 'FUEL',
+        paymentMode: 'CASH',
       });
       // Blank optionals must be omitted — the API rejects unknown/empty keys.
       expect(payload).not.toHaveProperty('notes');

@@ -1,11 +1,27 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
-  FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators,
+  FormArray,
+  FormBuilder,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
 } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
-  EXPENSE_CATEGORIES, INCOME_CATEGORIES, PaymentMode, TransactionType,
+  EXPENSE_CATEGORIES,
+  INCOME_CATEGORIES,
+  PaymentMode,
+  TransactionType,
 } from '../../core/models/enums';
 import { ScannedReceipt } from '../../core/models/receipt.model';
 import { LineItem, TransactionPayload } from '../../core/models/transaction.model';
@@ -15,6 +31,8 @@ import { TransactionService } from '../../core/services/transaction.service';
 import { isFutureDate, toDateInputValue, toIsoFromDateInput } from '../../core/utils/date.util';
 import { multiplyMoney, roundMoney, sumMoney } from '../../core/utils/money.util';
 import { InrPipe } from '../../shared/pipes/inr.pipe';
+import { AppHeader } from '../../shared/components/app-header/app-header';
+import { Icon } from '../../shared/components/icon/icon';
 
 /** One row of an itemised bill. */
 type LineItemGroup = FormGroup<{
@@ -24,15 +42,13 @@ type LineItemGroup = FormGroup<{
 }>;
 
 type ScanState =
-  | { phase: 'idle' }
-  | { phase: 'uploading'; percent: number }
-  | { phase: 'analysing' };
+  { phase: 'idle' } | { phase: 'uploading'; percent: number } | { phase: 'analysing' };
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 @Component({
   selector: 'app-add-expense',
-  imports: [ReactiveFormsModule, RouterLink, InrPipe],
+  imports: [ReactiveFormsModule, RouterLink, InrPipe, AppHeader, Icon],
   templateUrl: './add-expense.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -249,7 +265,10 @@ export class AddExpense implements OnInit {
         Validators.required,
         Validators.min(0),
       ]),
-      qty: this.fb.nonNullable.control(item?.qty ?? 1, [Validators.required, Validators.min(0.001)]),
+      qty: this.fb.nonNullable.control(item?.qty ?? 1, [
+        Validators.required,
+        Validators.min(0.001),
+      ]),
     });
   }
 
@@ -417,8 +436,13 @@ export class AddExpense implements OnInit {
     const { type, date, paymentMode, category } = this.form.getRawValue();
     this.items.clear();
     this.form.reset({
-      type, date, paymentMode, category,
-      amount: null, merchantName: '', notes: '',
+      type,
+      date,
+      paymentMode,
+      category,
+      amount: null,
+      merchantName: '',
+      notes: '',
     });
     this.scanned = false;
     this.scanWarnings.set([]);

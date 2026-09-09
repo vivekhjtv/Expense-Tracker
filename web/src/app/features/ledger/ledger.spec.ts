@@ -10,9 +10,14 @@ import { Ledger } from './ledger';
 const tx = (over: Partial<Transaction>): Transaction =>
   ({
     _id: Math.random().toString(36).slice(2),
-    amount: 100, type: 'EXPENSE', paymentMode: 'CASH', category: 'GROCERIES',
+    amount: 100,
+    type: 'EXPENSE',
+    paymentMode: 'CASH',
+    category: 'GROCERIES',
     date: new Date().toISOString(),
-    source: 'MANUAL', createdAt: '', updatedAt: '',
+    source: 'MANUAL',
+    createdAt: '',
+    updatedAt: '',
     ...over,
   }) as Transaction;
 
@@ -41,7 +46,10 @@ describe('Ledger', () => {
       providers: [
         provideZonelessChangeDetection(),
         provideRouter([]),
-        { provide: TransactionService, useValue: { list, remove: vi.fn(() => of({ message: 'ok' })) } },
+        {
+          provide: TransactionService,
+          useValue: { list, remove: vi.fn(() => of({ message: 'ok' })) },
+        },
       ],
     }).compileComponents();
 
@@ -53,7 +61,9 @@ describe('Ledger', () => {
   describe('day grouping', () => {
     it('groups transactions under one header per day', async () => {
       await setup([
-        tx({ date: isoDaysAgo(0) }), tx({ date: isoDaysAgo(0) }), tx({ date: isoDaysAgo(1) }),
+        tx({ date: isoDaysAgo(0) }),
+        tx({ date: isoDaysAgo(0) }),
+        tx({ date: isoDaysAgo(1) }),
       ]);
       const groups = component.groups();
       expect(groups.length).toBe(2);
@@ -77,13 +87,18 @@ describe('Ledger', () => {
 
     it('subtotals without float drift', async () => {
       await setup([
-        tx({ date: isoDaysAgo(0), amount: 0.1 }), tx({ date: isoDaysAgo(0), amount: 0.2 }),
+        tx({ date: isoDaysAgo(0), amount: 0.1 }),
+        tx({ date: isoDaysAgo(0), amount: 0.2 }),
       ]);
       expect(component.groups()[0].spent).toBe(0.3);
     });
 
     it('preserves the API ordering rather than re-sorting', async () => {
-      await setup([tx({ date: isoDaysAgo(0) }), tx({ date: isoDaysAgo(3) }), tx({ date: isoDaysAgo(7) })]);
+      await setup([
+        tx({ date: isoDaysAgo(0) }),
+        tx({ date: isoDaysAgo(3) }),
+        tx({ date: isoDaysAgo(7) }),
+      ]);
       expect(component.groups().map((g: any) => g.label)[0]).toBe('Today');
     });
   });
@@ -267,7 +282,10 @@ describe('Ledger', () => {
       await settle();
 
       expect(list.mock.calls.at(-1)![0]).toMatchObject({
-        paymentMode: 'CASH', category: 'GROCERIES', search: 'milk', range: 'LAST_MONTH',
+        paymentMode: 'CASH',
+        category: 'GROCERIES',
+        search: 'milk',
+        range: 'LAST_MONTH',
       });
     });
 
@@ -318,7 +336,12 @@ describe('Ledger', () => {
     });
 
     it('totals line items exactly', async () => {
-      const t = tx({ items: [{ name: 'Milk', price: 34, qty: 2 }, { name: 'Atta', price: 265.5, qty: 1 }] });
+      const t = tx({
+        items: [
+          { name: 'Milk', price: 34, qty: 2 },
+          { name: 'Atta', price: 265.5, qty: 1 },
+        ],
+      });
       await setup([t]);
       expect(component.itemsTotal(t)).toBe(333.5);
     });

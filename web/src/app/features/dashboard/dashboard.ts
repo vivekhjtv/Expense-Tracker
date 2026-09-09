@@ -5,6 +5,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { DashboardData } from '../../core/models/analytics.model';
 import { categoryMeta, DateRangePreset } from '../../core/models/enums';
 import { AnalyticsService } from '../../core/services/analytics.service';
+import { AppHeader } from '../../shared/components/app-header/app-header';
 import { CategoryDonut } from '../../shared/components/category-donut/category-donut';
 import { SplitBar } from '../../shared/components/split-bar/split-bar';
 import { TrendBars } from '../../shared/components/trend-bars/trend-bars';
@@ -19,9 +20,22 @@ const RANGES = [
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, InrPipe, TrendBars, CategoryDonut, SplitBar],
+  imports: [RouterLink, InrPipe, TrendBars, CategoryDonut, SplitBar, AppHeader],
   templateUrl: './dashboard.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: `
+    /* The hero is the only tinted surface on the page. The wash is built from
+       the accent token, so it re-tints itself in dark mode instead of
+       carrying a hardcoded pastel that would glow on near-black. */
+    .hero {
+      background-image: linear-gradient(
+        155deg,
+        color-mix(in oklab, var(--color-accent) 14%, var(--color-card)),
+        var(--color-card) 62%
+      );
+      border-color: var(--color-accent-line);
+    }
+  `,
 })
 export class Dashboard {
   private readonly analyticsService = inject(AnalyticsService);

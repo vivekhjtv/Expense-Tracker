@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { CategorySlice } from '../../../core/models/analytics.model';
 import { categoryMeta } from '../../../core/models/enums';
-import { CHART_OTHER, CHART_SERIES } from '../../chart-palette';
+import { CHART_EMPTY, CHART_OTHER, CHART_SERIES } from '../../chart-palette';
 import { InrPipe } from '../../pipes/inr.pipe';
 
 interface Segment {
@@ -42,27 +42,43 @@ const GAP = 3;
       <figcaption class="sr-only">Spending by category</figcaption>
 
       <div class="flex items-center gap-4">
-        <svg viewBox="0 0 130 130" class="size-32 shrink-0 -rotate-90" role="img" [attr.aria-label]="ariaLabel()">
+        <svg
+          viewBox="0 0 130 130"
+          class="size-32 shrink-0 -rotate-90"
+          role="img"
+          [attr.aria-label]="ariaLabel()"
+        >
           @for (segment of segments(); track segment.slice.category) {
             <circle
-              cx="65" cy="65" [attr.r]="R"
+              cx="65"
+              cy="65"
+              [attr.r]="R"
               fill="none"
-              [attr.stroke]="segment.color"
+              [style.stroke]="segment.color"
               [attr.stroke-width]="STROKE"
               [attr.stroke-dasharray]="segment.dash + ' ' + segment.gap"
               [attr.stroke-dashoffset]="segment.offset"
             />
           }
           @if (!segments().length) {
-            <circle cx="65" cy="65" [attr.r]="R" fill="none" stroke="#e2e8f0" [attr.stroke-width]="STROKE" />
+            <circle
+              cx="65"
+              cy="65"
+              [attr.r]="R"
+              fill="none"
+              [style.stroke]="empty"
+              [attr.stroke-width]="STROKE"
+            />
           }
         </svg>
 
         <!-- Total in the hole: the number the ring is a breakdown of. -->
         <div class="min-w-0 flex-1">
-          <p class="text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Total spend</p>
-          <p class="text-2xl font-bold tracking-tight text-ink-900">{{ total() | inr: false }}</p>
-          <p class="mt-0.5 text-xs text-ink-500">
+          <p class="text-[11px] font-semibold tracking-wide text-fg-subtle uppercase">
+            Total spend
+          </p>
+          <p class="text-2xl font-bold tracking-tight text-fg">{{ total() | inr: false }}</p>
+          <p class="mt-0.5 text-xs text-fg-muted">
             across {{ slices().length }} categor{{ slices().length === 1 ? 'y' : 'ies' }}
           </p>
         </div>
@@ -78,13 +94,14 @@ const GAP = 3;
               [style.background-color]="segment.color"
               aria-hidden="true"
             ></span>
-            <span class="min-w-0 flex-1 truncate text-sm text-ink-700">
-              <span class="mr-1" aria-hidden="true">{{ segment.icon }}</span>{{ segment.label }}
+            <span class="min-w-0 flex-1 truncate text-sm text-fg">
+              <span class="mr-1" aria-hidden="true">{{ segment.icon }}</span
+              >{{ segment.label }}
             </span>
-            <span class="shrink-0 text-sm font-semibold text-ink-900">
+            <span class="shrink-0 text-sm font-semibold text-fg">
               {{ segment.slice.total | inr: false }}
             </span>
-            <span class="w-11 shrink-0 text-right text-xs tabular-nums text-ink-400">
+            <span class="w-11 shrink-0 text-right text-xs tabular-nums text-fg-subtle">
               {{ segment.slice.sharePct.toFixed(0) }}%
             </span>
           </li>
@@ -97,10 +114,11 @@ export class CategoryDonut {
   readonly slices = input.required<CategorySlice[]>();
 
   protected readonly R = R;
+  protected readonly empty = CHART_EMPTY;
   protected readonly STROKE = STROKE;
 
-  protected readonly total = computed(() =>
-    Math.round(this.slices().reduce((sum, s) => sum + s.total, 0) * 100) / 100,
+  protected readonly total = computed(
+    () => Math.round(this.slices().reduce((sum, s) => sum + s.total, 0) * 100) / 100,
   );
 
   protected readonly segments = computed<Segment[]>(() => {
@@ -146,9 +164,10 @@ export class CategoryDonut {
     });
   });
 
-  protected readonly ariaLabel = computed(() =>
-    this.segments()
-      .map((s) => `${s.label} ${s.slice.sharePct.toFixed(0)} percent`)
-      .join(', ') || 'No spending recorded',
+  protected readonly ariaLabel = computed(
+    () =>
+      this.segments()
+        .map((s) => `${s.label} ${s.slice.sharePct.toFixed(0)} percent`)
+        .join(', ') || 'No spending recorded',
   );
 }

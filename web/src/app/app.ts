@@ -21,8 +21,8 @@ import { ToastHost } from './shared/components/toast-host/toast-host';
   template: `
     <!-- Indeterminate top bar; the only global signal that a request is in flight. -->
     @if (loading.isLoading()) {
-      <div class="fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden bg-brand-100">
-        <div class="h-full w-1/3 animate-[progress_1.1s_ease-in-out_infinite] bg-brand-600"></div>
+      <div class="fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden bg-accent-soft">
+        <div class="h-full w-1/3 animate-[progress_1.1s_ease-in-out_infinite] bg-accent"></div>
       </div>
     }
 
@@ -30,9 +30,7 @@ import { ToastHost } from './shared/components/toast-host/toast-host';
 
     <div class="mx-auto min-h-dvh max-w-md">
       <!-- Bottom padding clears the fixed nav, but only when the nav is there. -->
-      <main
-        [style.padding-bottom]="showNav() ? 'calc(7rem + env(safe-area-inset-bottom))' : '0'"
-      >
+      <main [style.padding-bottom]="showNav() ? 'calc(9.5rem + env(safe-area-inset-bottom))' : '0'">
         <router-outlet />
       </main>
     </div>
@@ -43,8 +41,12 @@ import { ToastHost } from './shared/components/toast-host/toast-host';
   `,
   styles: `
     @keyframes progress {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(400%); }
+      0% {
+        transform: translateX(-100%);
+      }
+      100% {
+        transform: translateX(400%);
+      }
     }
   `,
 })

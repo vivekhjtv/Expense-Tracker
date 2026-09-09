@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { DailyPoint } from '../../../core/models/analytics.model';
-import { CHART_GRID, CHART_PRIMARY } from '../../chart-palette';
+import { CHART_GRID, CHART_LABEL, CHART_PRIMARY } from '../../chart-palette';
 import { InrPipe } from '../../pipes/inr.pipe';
 
 interface Bar {
@@ -37,13 +37,13 @@ const PAD_X = 4;
 
       <!-- Tapped value sits above the plot in a fixed slot, so revealing it
            never reflows the chart underneath the user's finger. -->
-      <p class="mb-1 h-5 text-xs font-semibold text-ink-700">
+      <p class="mb-1 h-5 text-xs font-semibold text-fg">
         @if (selected(); as bar) {
           {{ bar.point.total | inr }}
-          <span class="font-normal text-ink-400">· {{ label(bar.point.date) }}</span>
+          <span class="font-normal text-fg-subtle">· {{ label(bar.point.date) }}</span>
         } @else if (peak(); as top) {
-          <span class="font-normal text-ink-400">Highest: </span>{{ top.total | inr }}
-          <span class="font-normal text-ink-400">on {{ label(top.date) }}</span>
+          <span class="font-normal text-fg-subtle">Highest: </span>{{ top.total | inr }}
+          <span class="font-normal text-fg-subtle">on {{ label(top.date) }}</span>
         }
       </p>
 
@@ -57,8 +57,13 @@ const PAD_X = 4;
         <!-- Hairline grid, solid and one step off the surface. -->
         @for (line of gridLines(); track line.value) {
           <line
-            [attr.x1]="0" [attr.x2]="VIEW_W" [attr.y1]="line.y" [attr.y2]="line.y"
-            [attr.stroke]="grid" stroke-width="1" vector-effect="non-scaling-stroke"
+            [attr.x1]="0"
+            [attr.x2]="VIEW_W"
+            [attr.y1]="line.y"
+            [attr.y2]="line.y"
+            [style.stroke]="grid"
+            stroke-width="1"
+            vector-effect="non-scaling-stroke"
           />
         }
 
@@ -66,17 +71,21 @@ const PAD_X = 4;
           <!-- Invisible full-height hit area: the bar itself can be 2px tall,
                far below a usable touch target. -->
           <rect
-            [attr.x]="bar.x - 1" [attr.y]="0"
-            [attr.width]="bar.width + 2" [attr.height]="PLOT_H"
+            [attr.x]="bar.x - 1"
+            [attr.y]="0"
+            [attr.width]="bar.width + 2"
+            [attr.height]="PLOT_H"
             fill="transparent"
             class="cursor-pointer"
             (click)="toggle(bar)"
           />
           @if (bar.height > 0) {
             <rect
-              [attr.x]="bar.x" [attr.y]="bar.y"
-              [attr.width]="bar.width" [attr.height]="bar.height"
-              [attr.fill]="primary"
+              [attr.x]="bar.x"
+              [attr.y]="bar.y"
+              [attr.width]="bar.width"
+              [attr.height]="bar.height"
+              [style.fill]="primary"
               [attr.fill-opacity]="isDimmed(bar) ? 0.28 : 1"
               rx="2"
               class="pointer-events-none transition-opacity"
@@ -86,17 +95,27 @@ const PAD_X = 4;
 
         <!-- Baseline sits above the axis band so labels are never clipped. -->
         <line
-          [attr.x1]="0" [attr.x2]="VIEW_W" [attr.y1]="PLOT_H" [attr.y2]="PLOT_H"
-          [attr.stroke]="grid" stroke-width="1" vector-effect="non-scaling-stroke"
+          [attr.x1]="0"
+          [attr.x2]="VIEW_W"
+          [attr.y1]="PLOT_H"
+          [attr.y2]="PLOT_H"
+          [style.stroke]="grid"
+          stroke-width="1"
+          vector-effect="non-scaling-stroke"
         />
 
         <!-- Selective labels: first, last and the peak. A number on every day
              would be unreadable at this width. -->
         @for (tick of ticks(); track tick.x) {
           <text
-            [attr.x]="tick.x" [attr.y]="PLOT_H + 15"
-            text-anchor="middle" font-size="10" fill="#94a3b8"
-          >{{ tick.label }}</text>
+            [attr.x]="tick.x"
+            [attr.y]="PLOT_H + 15"
+            text-anchor="middle"
+            font-size="10"
+            [style.fill]="labelColor"
+          >
+            {{ tick.label }}
+          </text>
         }
       </svg>
     </figure>
@@ -110,12 +129,11 @@ export class TrendBars {
   protected readonly AXIS_H = AXIS_H;
   protected readonly primary = CHART_PRIMARY;
   protected readonly grid = CHART_GRID;
+  protected readonly labelColor = CHART_LABEL;
 
   private readonly selectedDate = signal<string | null>(null);
 
-  protected readonly max = computed(() =>
-    Math.max(1, ...this.points().map((p) => p.total)),
-  );
+  protected readonly max = computed(() => Math.max(1, ...this.points().map((p) => p.total)));
 
   protected readonly bars = computed<Bar[]>(() => {
     const points = this.points();
@@ -165,8 +183,11 @@ export class TrendBars {
     const chosen = new Set([bars[0], bars[bars.length - 1]]);
     const peakBar = bars.find((b) => b.point.date === peakDate);
     // Skip the peak label if it would collide with an endpoint label.
-    if (peakBar && Math.abs(peakBar.x - bars[0].x) > 40 &&
-        Math.abs(peakBar.x - bars[bars.length - 1].x) > 40) {
+    if (
+      peakBar &&
+      Math.abs(peakBar.x - bars[0].x) > 40 &&
+      Math.abs(peakBar.x - bars[bars.length - 1].x) > 40
+    ) {
       chosen.add(peakBar);
     }
     return [...chosen]
@@ -185,9 +206,7 @@ export class TrendBars {
   }
 
   protected toggle(bar: Bar): void {
-    this.selectedDate.update((current) =>
-      current === bar.point.date ? null : bar.point.date,
-    );
+    this.selectedDate.update((current) => (current === bar.point.date ? null : bar.point.date));
   }
 
   protected label(date: string): string {

@@ -41,6 +41,9 @@ export class ToastService {
     const id = this.nextId++;
     // Cap the stack — a burst of failures should not paper over the screen.
     this.toasts.update((list) => [...list.slice(-2), { id, kind, message }]);
-    this.timers.set(id, setTimeout(() => this.dismiss(id), ttl));
+    this.timers.set(
+      id,
+      setTimeout(() => this.dismiss(id), ttl),
+    );
   }
 }

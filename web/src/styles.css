@@ -1,48 +1,155 @@
 @import 'tailwindcss';
 
 /**
- * Design tokens.
+ * Theming
+ * =======
  *
- * The palette is built around a single indigo accent with semantic red/green
- * for money direction, because on a spending screen colour has to mean one
- * thing only: red is money out, green is money in. Everything else stays
- * neutral so those two never have to compete for attention.
+ * Every colour in this app is a SEMANTIC token — `bg-card`, `text-fg-muted`,
+ * `border-line` — never a literal shade. That is what makes two themes
+ * possible without a `dark:` variant on every element: the utilities compile
+ * to `var(--color-card)`, and the dark block below simply reassigns those
+ * variables. A component written once renders correctly in both themes.
+ *
+ * The rule that keeps this honest: if a template needs `dark:` to look right,
+ * the token set is missing something. Add the token instead.
+ *
+ * Contrast is verified, not eyeballed. Every text token clears WCAG AA (4.5:1)
+ * against the *worst* surface it can land on — which is `sunken`, not `card`:
+ *   light  fg 18.7 · fg-muted 6.7 · fg-subtle 4.7
+ *   dark   fg 15.4 · fg-muted 7.7 · fg-subtle 4.9
  */
+
 @theme {
-  --color-ink-50: #f8fafc;
-  --color-ink-100: #f1f5f9;
-  --color-ink-200: #e2e8f0;
-  --color-ink-300: #cbd5e1;
-  --color-ink-400: #94a3b8;
-  --color-ink-500: #64748b;
-  --color-ink-600: #475569;
-  --color-ink-700: #334155;
-  --color-ink-800: #1e293b;
-  --color-ink-900: #0f172a;
+  /* --- Surfaces, back to front ----------------------------------- */
+  --color-canvas: #f5f6f8; /* the page itself */
+  --color-card: #ffffff; /* raised panels */
+  --color-sunken: #f2f4f7; /* insets: item rows, expanded detail */
+  --color-raised: #ffffff; /* the selected pill inside a sunken track */
+  --color-hover: #eceff4; /* pressed / hovered state */
+  --color-line: #e6e9ef; /* hairline borders */
+  --color-line-strong: #d5dae4; /* dashed drop zones, dividers that must read */
 
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
+  /* --- Text ------------------------------------------------------- */
+  --color-fg: #0d1220;
+  --color-fg-muted: #525c70;
+  --color-fg-subtle: #646d7e;
 
-  --color-spend-50: #fef2f2;
-  --color-spend-100: #fee2e2;
-  --color-spend-600: #dc2626;
-  --color-spend-700: #b91c1c;
+  /* --- Accent ----------------------------------------------------- */
+  --color-accent: #5457e5; /* filled buttons, active chips */
+  --color-accent-ink: #ffffff; /* text ON accent */
+  --color-accent-fg: #4144d4; /* accent as text, on card */
+  --color-accent-soft: #eef0ff; /* accent as a wash */
+  --color-accent-line: #c9cdfb;
 
-  --color-earn-50: #f0fdf4;
-  --color-earn-100: #dcfce7;
-  --color-earn-600: #16a34a;
-  --color-earn-700: #15803d;
+  /* --- Money direction -------------------------------------------- */
+  --color-spend: #dc2626;
+  --color-spend-fg: #b91c1c;
+  --color-spend-soft: #fef2f2;
+  --color-spend-line: #fecaca;
 
-  --color-move-50: #eff6ff;
-  --color-move-100: #dbeafe;
-  --color-move-600: #2563eb;
+  --color-earn: #16a34a;
+  --color-earn-fg: #15803d;
+  --color-earn-soft: #f0fdf4;
+  --color-earn-line: #bbf7d0;
 
-  --font-sans:
-    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --color-warn: #d97706;
+  --color-warn-fg: #b45309;
+  --color-warn-soft: #fffbeb;
+  --color-warn-line: #fde68a;
+
+  /* --- Charts -----------------------------------------------------
+     Six categorical slots, consumed in order, never cycled. Both themes'
+     sets were run through the colour-vision validator; see chart-palette.ts
+     for the numbers and the constraint they impose. */
+  --color-chart-1: #2a78d6;
+  --color-chart-2: #eb6834;
+  --color-chart-3: #1baf7a;
+  --color-chart-4: #eda100;
+  --color-chart-5: #e87ba4;
+  --color-chart-6: #008300;
+  --color-chart-other: #94a3b8;
+  --color-chart-grid: #e6e9ef;
+  --color-chart-empty: #eceff4;
+
+  /* --- Type & motion ---------------------------------------------- */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --radius-card: 1.25rem;
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+/*
+ * Dark theme.
+ *
+ * Keyed on an attribute rather than `prefers-color-scheme` because the user
+ * gets three choices — light, dark, follow the system — and only an explicit
+ * attribute can express "dark even though the OS says light". ThemeService
+ * resolves "system" itself and always writes light or dark here, so there is
+ * no media-query branch to keep in sync.
+ *
+ * These are chosen values, not inverted ones. A flipped light palette gives
+ * you pure black and full-chroma accents that vibrate on an OLED phone at
+ * night; every step here was picked against the dark surface instead.
+ */
+:root[data-theme='dark'] {
+  --color-canvas: #0a0e17;
+  --color-card: #141a26;
+  --color-sunken: #1b2231;
+  /* Lighter than `sunken`, not darker. In light mode a selected segment is
+     white on grey — brighter than its track. Reusing `card` for that in dark
+     makes the pill DARKER than the track it sits in, so the selected option
+     reads as the recessed one. This is the token that keeps "raised" meaning
+     raised in both themes. */
+  --color-raised: #2a3346;
+  --color-hover: #222a3a;
+  --color-line: #252d3d;
+  --color-line-strong: #37415a;
+
+  --color-fg: #eef1f6;
+  --color-fg-muted: #a3adc2;
+  --color-fg-subtle: #8590a5;
+
+  /* The accent lightens: #5457e5 on near-black is legible but joyless, and
+     it fails as text. The filled-button step stays saturated, the text step
+     goes lighter still. */
+  --color-accent: #6366f1;
+  --color-accent-ink: #ffffff;
+  --color-accent-fg: #a9abff;
+  --color-accent-soft: #1e2140;
+  --color-accent-line: #363b78;
+
+  /* Money colours move to the pale end — a dark-mode red at #dc2626 reads as
+     brown against #141a26 and drops below AA as text. */
+  --color-spend: #f87171;
+  --color-spend-fg: #fca5a5;
+  --color-spend-soft: #2a1618;
+  --color-spend-line: #4d2224;
+
+  --color-earn: #4ade80;
+  --color-earn-fg: #86efac;
+  --color-earn-soft: #0f2318;
+  --color-earn-line: #1d4430;
+
+  --color-warn: #fbbf24;
+  --color-warn-fg: #fcd34d;
+  --color-warn-soft: #2a2010;
+  --color-warn-line: #4a3a14;
+
+  --color-chart-1: #4693f3;
+  --color-chart-2: #e76530;
+  --color-chart-3: #14ac77;
+  --color-chart-4: #c48300;
+  --color-chart-5: #d56a93;
+  --color-chart-6: #42ac3c;
+  --color-chart-other: #64748b;
+  --color-chart-grid: #252d3d;
+  --color-chart-empty: #1b2231;
+}
+
+/* Lets a template reach for `dark:` in the rare case a token cannot express
+   the difference — a shadow that must disappear, a gradient that must flip. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /* ------------------------------------------------------------------ */
 /* Base                                                                */
@@ -51,13 +158,33 @@
 html {
   /* Stops iOS Safari zooming the whole page when a text input is focused. */
   -webkit-text-size-adjust: 100%;
+  /* Set alongside data-theme by ThemeService. Native UI — date pickers,
+     select menus, scrollbars, autofill — reads this, not our variables. */
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 body {
-  @apply bg-ink-100 text-ink-900 font-sans antialiased;
+  @apply bg-canvas text-fg font-sans antialiased;
   /* Kills the grey flash on every tap in mobile Safari/Chrome. */
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+}
+
+/* Theme switches animate, so the change reads as one deliberate move rather
+   than a flicker. Scoped to colour only — animating `all` here would drag
+   every layout property on the page through a transition. */
+:root[data-theme] body,
+:root[data-theme] body * {
+  transition:
+    background-color 200ms var(--ease-out-soft),
+    border-color 200ms var(--ease-out-soft),
+    color 200ms var(--ease-out-soft),
+    fill 200ms var(--ease-out-soft),
+    stroke 200ms var(--ease-out-soft);
 }
 
 /* Number inputs: hide the desktop spinners, which are unusable on touch
@@ -92,6 +219,13 @@ input[type='date']::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 
+/* Keyboard focus gets a visible ring everywhere; pointer focus does not, so
+   tapping a card on a phone never leaves a stuck outline. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -105,8 +239,23 @@ input[type='date']::-webkit-calendar-picker-indicator {
 /* Component primitives                                                */
 /* ------------------------------------------------------------------ */
 
+/*
+ * Cards separate from the canvas differently in each theme, because the two
+ * have opposite physics. In light, the card is brighter than the page and a
+ * soft shadow lifts it. In dark, a shadow on near-black is invisible — the
+ * card is instead *lighter* than the page and a hairline does the work.
+ */
 @utility card {
-  @apply rounded-2xl bg-white shadow-sm ring-1 ring-ink-200/70;
+  border-radius: var(--radius-card);
+  background-color: var(--color-card);
+  border: 1px solid var(--color-line);
+  box-shadow:
+    0 1px 2px rgb(13 18 32 / 0.04),
+    0 6px 16px -6px rgb(13 18 32 / 0.08);
+}
+
+:root[data-theme='dark'] .card {
+  box-shadow: none;
 }
 
 /* 44px minimum — the smallest reliably tappable target on a phone. */
@@ -115,16 +264,150 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 @utility field {
-  @apply w-full rounded-xl border-0 bg-ink-100 px-4 py-3 text-base text-ink-900
-         ring-1 ring-inset ring-ink-200 outline-none transition
-         placeholder:text-ink-400
-         focus:bg-white focus:ring-2 focus:ring-brand-500;
+  @apply w-full rounded-xl border px-4 py-3 text-base outline-none transition;
+  background-color: var(--color-sunken);
+  border-color: var(--color-line);
+  color: var(--color-fg);
+}
+.field::placeholder {
+  color: var(--color-fg-subtle);
+}
+.field:focus {
+  background-color: var(--color-card);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 22%, transparent);
 }
 
 @utility field-error {
-  @apply ring-spend-600 focus:ring-spend-600;
+  border-color: var(--color-spend);
+}
+.field-error:focus {
+  border-color: var(--color-spend);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-spend) 22%, transparent);
 }
 
 @utility label {
-  @apply mb-1.5 block text-xs font-semibold tracking-wide text-ink-500 uppercase;
+  @apply mb-1.5 block text-xs font-semibold tracking-wide uppercase;
+  color: var(--color-fg-muted);
+}
+
+/*
+ * Chips are everywhere — range pickers, payment mode, categories, filters —
+ * and they were being spelled out as a ternary between two long class strings
+ * at each site. Two utilities keep every chip in the app identical.
+ */
+@utility chip {
+  @apply tap inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full
+         px-4 text-xs font-semibold transition;
+  background-color: var(--color-card);
+  color: var(--color-fg-muted);
+  border: 1px solid var(--color-line);
+}
+.chip:active {
+  background-color: var(--color-hover);
+}
+
+@utility chip-on {
+  background-color: var(--color-fg);
+  border-color: var(--color-fg);
+  color: var(--color-canvas);
+}
+
+@utility chip-accent {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+/* A selected option inside a sunken track — the type switcher, the theme
+   choice. Always brighter than the track, in both themes. */
+@utility segment-on {
+  background-color: var(--color-raised);
+  box-shadow: 0 1px 3px rgb(13 18 32 / 0.1);
+}
+
+/* The one filled call to action per screen. */
+@utility btn-primary {
+  @apply tap flex w-full items-center justify-center gap-2 rounded-xl py-3.5
+         text-base font-semibold transition;
+  background-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  box-shadow: 0 4px 14px -4px color-mix(in oklab, var(--color-accent) 55%, transparent);
+}
+.btn-primary:active {
+  transform: scale(0.99);
+}
+.btn-primary:disabled {
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+@utility btn-quiet {
+  @apply tap flex items-center justify-center gap-2 rounded-xl py-3
+         text-sm font-semibold transition;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-line);
+  color: var(--color-fg-muted);
+}
+.btn-quiet:active {
+  background-color: var(--color-hover);
+}
+.btn-quiet:disabled {
+  opacity: 0.4;
+}
+
+/* Sticky headers and the bottom bar sit over scrolling content. The blur is
+   what keeps them legible; the translucency is what makes them feel like
+   glass rather than a lid. */
+@utility surface-blur {
+  /* Opaque enough to stay a surface. An earlier pass used 82% with
+     saturate(160%), which turned the FAB and the donut behind the nav bar
+     into a visible rainbow smear — the saturation boost was amplifying
+     exactly the content the bar is supposed to sit calmly on top of. */
+  background-color: color-mix(in oklab, var(--color-card) 92%, transparent);
+  backdrop-filter: blur(16px) saturate(105%);
+  -webkit-backdrop-filter: blur(16px) saturate(105%);
+}
+
+/* Skeletons shimmer instead of pulsing: a pulse on a low-contrast dark
+   surface is nearly invisible, a travelling highlight is not. */
+@utility skeleton {
+  background-color: var(--color-sunken);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--color-fg) 7%, transparent),
+    transparent
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -100% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* Money is compared down a column; proportional digits make that harder. */
+@utility money {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Used by templates that have no component stylesheet of their own (the two
+   templateUrl screens), so a panel or a row expands rather than appearing. */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }

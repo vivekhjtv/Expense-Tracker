@@ -1,33 +1,72 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Expense Tracker</title>
-    <base href="/" />
 
-    <!--
+<head>
+  <meta charset="utf-8" />
+  <title>Expense Tracker</title>
+  <base href="/" />
+
+  <!--
       viewport-fit=cover lets the app paint under the iPhone home indicator;
       the bottom nav then adds env(safe-area-inset-bottom) padding itself.
       maximum-scale is deliberately NOT set — locking zoom breaks
       accessibility for anyone who needs to magnify the screen.
     -->
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#4f46e5" />
-    <meta name="description" content="Track daily spending across cash, bank and UPI accounts." />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f5f6f8" />
+  <meta name="description" content="Track daily spending across cash and online payments." />
 
-    <!-- Lets the app run fullscreen when added to the iOS home screen. -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <!-- Lets the app run fullscreen when added to the iOS home screen. -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
-    <link rel="icon" href="favicon.ico" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-  </head>
-  <body>
-    <app-root></app-root>
-  </body>
+  <!-- <link rel="icon" href="favicon.ico" /> -->
+  <link rel="icon" href="expense-tracker.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!--
+      Theme, applied before first paint.
+
+      This has to be an inline, render-blocking script in <head>. Angular can
+      set data-theme too — ThemeService does — but not until the bundle has
+      downloaded, parsed and bootstrapped, and a dark-mode user would stare at
+      a full white screen for that entire time. On a phone on mobile data that
+      is a real fraction of a second of flashbang.
+
+      The storage key must match STORAGE_KEY in theme.service.ts.
+    -->
+  <script>
+    (function () {
+      var mode = 'light';
+      try {
+        var saved = localStorage.getItem('expense-tracker.theme');
+        mode =
+          saved === 'light' || saved === 'dark'
+            ? saved
+            : window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+      } catch (e) {
+        /* Storage blocked (private mode, embedded webview). Light is fine. */
+      }
+      var root = document.documentElement;
+      root.setAttribute('data-theme', mode);
+      root.style.colorScheme = mode;
+      if (mode === 'dark') {
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', '#0a0e17');
+        /* Painted before the stylesheet arrives, so the very first frame is
+         already dark rather than white-then-dark. */
+        root.style.backgroundColor = '#0a0e17';
+      }
+    })();
+  </script>
+</head>
+
+<body>
+  <app-root></app-root>
+</body>
+
 </html>

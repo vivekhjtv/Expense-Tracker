@@ -6,7 +6,10 @@ import { CHART_OTHER, CHART_SERIES } from '../../chart-palette';
 import { CategoryDonut } from './category-donut';
 
 const slice = (category: string, total: number, sharePct: number): CategorySlice => ({
-  category, total, count: 1, sharePct,
+  category,
+  total,
+  count: 1,
+  sharePct,
 });
 
 describe('CategoryDonut', () => {
@@ -34,8 +37,11 @@ describe('CategoryDonut', () => {
 
   it('assigns palette slots in fixed order, never cycling', () => {
     render([
-      slice('A', 60, 30), slice('B', 50, 25), slice('C', 40, 20),
-      slice('D', 30, 15), slice('E', 20, 10),
+      slice('A', 60, 30),
+      slice('B', 50, 25),
+      slice('C', 40, 20),
+      slice('D', 30, 15),
+      slice('E', 20, 10),
     ]);
     expect(component.segments().map((s: any) => s.color)).toEqual(CHART_SERIES.slice(0, 5));
   });
@@ -44,9 +50,14 @@ describe('CategoryDonut', () => {
     // Past six segments adjacent arcs blur; a seventh generated hue would be
     // indistinguishable under colour-vision deficiency.
     render([
-      slice('A', 60, 25), slice('B', 50, 21), slice('C', 40, 17),
-      slice('D', 30, 12), slice('E', 20, 8), slice('F', 15, 6),
-      slice('G', 10, 4), slice('H', 5, 2),
+      slice('A', 60, 25),
+      slice('B', 50, 21),
+      slice('C', 40, 17),
+      slice('D', 30, 12),
+      slice('E', 20, 8),
+      slice('F', 15, 6),
+      slice('G', 10, 4),
+      slice('H', 5, 2),
     ]);
     const segments = component.segments();
     expect(segments.length).toBe(6);
