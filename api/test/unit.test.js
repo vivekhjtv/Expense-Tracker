@@ -204,10 +204,72 @@ const img = { buffer: Buffer.from([0xff,0xd8,0xff]), mimeType: 'image/jpeg', siz
           .checkConfiguration('gemini-3.5-flash')
           .then((over) => {
             check('honours an explicit model override', over.ok === true && over.model === 'gemini-3.5-flash');
-            console.log(`\n${pass} passed, ${fail} failed`);
-            process.exit(fail ? 1 : 0);
+            retrySuite();
           });
       });
     });
   });
 })();
+
+/* ---- transient overload retry ---------------------------------------- */
+function retrySuite() {
+  console.log('\n--- overload retry ---');
+  const cfg = {
+    getOrThrow: (k) => ({ 'gemini.model': 'gemini-flash-latest', 'gemini.thinkingBudget': 0 }[k]),
+    get: () => undefined,
+  };
+
+  const overloaded = () => {
+    const e = new Error(JSON.stringify({ error: { code: 503, status: 'UNAVAILABLE', message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.' } }));
+    e.status = 503;
+    return e;
+  };
+  const badKey = () => {
+    const e = new Error(JSON.stringify({ error: { code: 400, status: 'INVALID_ARGUMENT', message: 'API key not valid. Please pass a valid API key.' } }));
+    e.status = 400;
+    return e;
+  };
+
+  const payload = { isReceipt: true, merchantName: 'DMart', totalAmount: 100, items: [], paymentMode: 'CASH', category: 'GROCERIES', confidence: 0.9 };
+  const img = { buffer: Buffer.from([0xff, 0xd8, 0xff]), mimeType: 'image/jpeg', sizeBytes: 3, originalName: 'r.jpg' };
+
+  // Fails twice with overload, then succeeds — the real-world spike shape.
+  let calls = 0;
+  const flaky = { models: { generateContent: async () => {
+    calls++;
+    if (calls < 3) throw overloaded();
+    return { text: JSON.stringify(payload) };
+  } } };
+
+  const started = Date.now();
+  new ReceiptService(flaky, cfg).scan(img).then((r) => {
+    check('recovers from a transient overload', r.totalAmount === 100);
+    check('retried rather than failing on the first spike', calls === 3, `made ${calls} calls`);
+    check('backed off between attempts', Date.now() - started >= 1000, `took ${Date.now() - started}ms`);
+
+    // Persistent overload must give up and say something useful.
+    let alwaysBusy = 0;
+    const dead = { models: { generateContent: async () => { alwaysBusy++; throw overloaded(); } } };
+    new ReceiptService(dead, cfg).scan(img).then(
+      () => check('persistent overload should reject', false),
+      (err) => {
+        check('gives up after a bounded number of attempts', alwaysBusy === 3, `made ${alwaysBusy}`);
+        check('tells the user it is busy, not broken', /busy right now/i.test(err.message), `got="${err.message}"`);
+        check('no doubled full stop', !/\.\./.test(err.message), `got="${err.message}"`);
+
+        // A permanent error must NOT be retried — that just burns quota.
+        let keyCalls = 0;
+        const broken = { models: { generateContent: async () => { keyCalls++; throw badKey(); } } };
+        new ReceiptService(broken, cfg).scan(img).then(
+          () => check('bad key should reject', false),
+          (err2) => {
+            check('does not retry a permanent failure', keyCalls === 1, `made ${keyCalls}`);
+            check('still names the key problem', /GEMINI_API_KEY is not valid/.test(err2.message), `got="${err2.message}"`);
+            console.log(`\n${pass} passed, ${fail} failed`);
+            process.exit(fail ? 1 : 0);
+          },
+        );
+      },
+    );
+  });
+}

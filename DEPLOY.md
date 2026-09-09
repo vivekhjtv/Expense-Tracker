@@ -154,6 +154,7 @@ model name. Other causes it names:
 | model … is not available to this API key | Set `GEMINI_MODEL` to one your key can use |
 | restricted … referrers or IP addresses | The key has restrictions that block a server call |
 | region | Google does not serve Gemini where the API is hosted |
+| busy right now | Google is shedding load. The server already retries 3 times with backoff; if it still fails the spike is sustained — try again shortly, or switch `GEMINI_MODEL` to a less busy model |
 
 The API key is redacted from every log line and every response.
 

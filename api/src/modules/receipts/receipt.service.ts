@@ -63,7 +63,7 @@ export class ReceiptService {
     let text: string | undefined;
 
     try {
-      const response = await this.genai.models.generateContent({
+      const response = await this.generateWithRetry({
         model: this.model,
         contents: [
           {
@@ -123,6 +123,52 @@ export class ReceiptService {
         'Could not read the receipt reliably. Please enter the amount manually.',
       );
     }
+  }
+
+
+  /**
+   * Calls Gemini, retrying only genuinely transient failures.
+   *
+   * "The model is currently experiencing high demand" is Google shedding load,
+   * not a problem with the request — it usually succeeds within a second or
+   * two. Surfacing it to the user as a hard failure makes a working scanner
+   * look broken and pushes them to retype a bill by hand.
+   *
+   * Retries are deliberately narrow: a bad key, an unknown model or a rejected
+   * image will fail identically every time, and hammering them just burns
+   * quota and delays an error the user needs to see.
+   */
+  private async generateWithRetry(
+    request: Parameters<GoogleGenAI['models']['generateContent']>[0],
+    attempts = 3,
+  ): Promise<Awaited<ReturnType<GoogleGenAI['models']['generateContent']>>> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.genai.models.generateContent(request);
+      } catch (err) {
+        if (attempt >= attempts - 1 || !this.isTransient(err)) {
+          throw err;
+        }
+
+        // Exponential with jitter: several phones retrying in lockstep would
+        // otherwise re-create the spike that caused the overload.
+        const backoff = 400 * 2 ** attempt + Math.random() * 250;
+        this.logger.warn(
+          `Gemini busy (attempt ${attempt + 1}/${attempts}), retrying in ${Math.round(backoff)}ms`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, backoff));
+      }
+    }
+  }
+
+  /** Overload and 5xx are worth another go; everything else is not. */
+  private isTransient(err: unknown): boolean {
+    const raw = err instanceof Error ? err.message : String(err);
+    const status = (err as { status?: number })?.status ?? this.parseGeminiError(raw).code;
+
+    if (status === 503 || status === 500) return true;
+
+    return /high demand|overloaded|try again later|UNAVAILABLE|INTERNAL/i.test(raw);
   }
 
   /* ---------------------------------------------------------------- */
@@ -382,8 +428,16 @@ export class ReceiptService {
       );
     }
 
+    if (status === 503 || /high demand|overloaded|UNAVAILABLE/i.test(raw)) {
+      return new ServiceUnavailableException(
+        'Gemini is busy right now — this usually clears in a few seconds. ' +
+          'Tap scan again, or enter the amount manually.',
+      );
+    }
+
     return new ServiceUnavailableException(
-      `Receipt scanning failed${detail.message ? `: ${detail.message}` : ''}.`,
+      // Google's messages already end in a full stop; appending one gave "..".
+      `Receipt scanning failed${detail.message ? `: ${trimTrailingStop(detail.message)}` : ''}.`,
     );
   }
 
@@ -542,3 +596,6 @@ export class ReceiptService {
   }
 }
 
+function trimTrailingStop(text: string): string {
+  return text.replace(/\.+$/, '');
+}
