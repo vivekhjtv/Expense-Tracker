@@ -40,7 +40,7 @@ for a phone and renders as one on a desktop.
 
 ```bash
 cd api && npm test       # 100 tests: unit + integration against a real MongoDB
-cd web && npm test       # 75 tests: utils, pipe, form, charts, ledger
+cd web && npm test       # 108 tests: utils, pipe, form, charts, transactions
 ```
 
 The API integration suite runs against a real MongoDB and asserts that a spend can
@@ -60,7 +60,7 @@ See **[DEPLOY.md](DEPLOY.md)** — Angular on Vercel, NestJS on Render, step by 
 | 2 | Gemini Vision receipt scanner | ✅ |
 | 3 | Accounts + transactions + ACID transfers + analytics | ✅ |
 | 4 | Angular shell, services, interceptors, transaction form | ✅ |
-| 5 | Filterable ledger, dashboard + charts | ✅ |
+| 5 | Filterable transactions list, dashboard + charts | ✅ |
 | 6 | Removed accounts — simplified to a pure spending log | ✅ |
 | 7 | Email/password auth (JWT) + deployment configs | ✅ |
 
@@ -69,7 +69,7 @@ See **[DEPLOY.md](DEPLOY.md)** — Angular on Vercel, NestJS on Render, step by 
 | Route | What it does |
 |---|---|
 | `/` | Dashboard — total spend, biggest spend, daily trend, category donut, cash vs online |
-| `/ledger` | Filterable history grouped by day, cash/online badges, expandable line items |
+| `/transactions` | Filterable history grouped by day, cash/online badges, expandable line items |
 | `/add`, `/edit/:id` | Add a spend: amount, payment mode, category, optional line items, or scan a receipt |
 | `/settings` | Shortcuts and how it works |
 

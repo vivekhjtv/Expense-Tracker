@@ -35,11 +35,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/add-expense/add-expense').then((m) => m.AddExpense),
   },
   {
-    path: 'ledger',
-    title: 'Ledger · Expense Tracker',
+    path: 'transactions',
+    title: 'Transactions · Expense Tracker',
     canActivate: [authGuard],
-    loadComponent: () => import('./features/ledger/ledger').then((m) => m.Ledger),
+    loadComponent: () => import('./features/transactions/transactions').then((m) => m.Transactions),
   },
+  // The screen used to live at /ledger; anything already bookmarked or linked
+  // there still lands in the right place.
+  { path: 'ledger', pathMatch: 'full', redirectTo: 'transactions' },
   {
     path: 'settings',
     title: 'More · Expense Tracker',

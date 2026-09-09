@@ -76,7 +76,9 @@ export class AddExpense implements OnInit {
       Validators.min(0.01),
       Validators.max(1_000_000_000),
     ]),
-    paymentMode: this.fb.nonNullable.control<PaymentMode>(PaymentMode.CASH),
+    // Most spends here are UPI, so that is the default a quick entry should
+    // already be on. Cash is one tap away for the exceptions.
+    paymentMode: this.fb.nonNullable.control<PaymentMode>(PaymentMode.ONLINE_BANKING),
     category: this.fb.nonNullable.control('GROCERIES'),
     date: this.fb.nonNullable.control(toDateInputValue(), Validators.required),
     merchantName: this.fb.nonNullable.control(''),
@@ -344,7 +346,7 @@ export class AddExpense implements OnInit {
         // button honest about whether anything actually changed.
         this.form.markAsPristine();
       },
-      error: () => this.router.navigate(['/ledger']),
+      error: () => this.router.navigate(['/transactions']),
     });
   }
 
@@ -379,7 +381,7 @@ export class AddExpense implements OnInit {
         if (addAnother) {
           this.resetForNextEntry();
         } else {
-          this.router.navigate([editId ? '/ledger' : '/']);
+          this.router.navigate([editId ? '/transactions' : '/']);
         }
       },
       error: () => {

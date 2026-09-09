@@ -86,8 +86,8 @@ describe('AddExpense', () => {
       expect(component.form.valid).toBe(true);
     });
 
-    it('defaults to cash today, so a quick entry needs one field', () => {
-      expect(component.form.controls.paymentMode.value).toBe(PaymentMode.CASH);
+    it('defaults to UPI/Card today, so a quick entry needs one field', () => {
+      expect(component.form.controls.paymentMode.value).toBe(PaymentMode.ONLINE_BANKING);
       expect(component.form.controls.date.value).toBeTruthy();
     });
   });
@@ -163,7 +163,9 @@ describe('AddExpense', () => {
     });
 
     it('sends a clean expense payload', () => {
-      component.form.patchValue({ amount: 250, category: 'FUEL' });
+      // Payment mode set explicitly: the default belongs to the defaults test,
+      // this one is about the shape of what goes over the wire.
+      component.form.patchValue({ amount: 250, category: 'FUEL', paymentMode: 'CASH' });
       component.submit();
       const payload = transactionService.create.mock.calls[0][0];
       expect(payload).toMatchObject({

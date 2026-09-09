@@ -104,8 +104,8 @@ export class Settings {
   protected readonly links: { path: string; label: string; icon: IconName; hint: string }[] = [
     { path: '/add', label: 'Add a spend', icon: 'plus', hint: 'Type it in or scan a receipt' },
     {
-      path: '/ledger',
-      label: 'Full ledger',
+      path: '/transactions',
+      label: 'All transactions',
       icon: 'receipt',
       hint: 'Search and filter everything',
     },

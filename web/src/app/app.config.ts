@@ -12,7 +12,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(
       routes,
-      // Binds route params/query to component inputs, so the ledger's filters
+      // Binds route params/query to component inputs, so the transactions list's filters
       // can live in the URL and stay shareable and back-button friendly.
       withComponentInputBinding(),
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),

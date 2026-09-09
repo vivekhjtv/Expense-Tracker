@@ -80,7 +80,7 @@ Commit that, then in Vercel: **New Project → import the repo.**
 | Build Command | `npm run build` |
 | Output Directory | `dist/web/browser` |
 
-`web/vercel.json` already handles the SPA rewrite (so `/ledger` does not 404 on
+`web/vercel.json` already handles the SPA rewrite (so `/transactions` does not 404 on
 refresh), security headers, and long-lived caching for hashed assets.
 
 ---
@@ -101,7 +101,7 @@ Multiple origins are comma-separated. Include a custom domain here too if you ad
 
 1. Open the Vercel URL → you should land on the sign-in screen
 2. Create an account → you land on the dashboard
-3. Add a spend → it appears in the ledger
+3. Add a spend → it appears in the transactions list
 4. Scan a receipt → the form fills in
 5. Open in a private window → you must be signed out
 

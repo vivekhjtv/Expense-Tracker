@@ -109,7 +109,7 @@ export class BottomNav {
 
   protected readonly items: NavItem[] = [
     { path: '/', label: 'Home', icon: 'chart', exact: true },
-    { path: '/ledger', label: 'Ledger', icon: 'receipt', exact: false },
+    { path: '/transactions', label: 'Transactions', icon: 'receipt', exact: false },
     { path: '/settings', label: 'More', icon: 'sliders', exact: false },
   ];
 }

@@ -35,7 +35,7 @@ export type IconName =
  * accent-coloured turns its icon with it, in both themes, for free.
  *
  * Emoji stay where they encode *data* rather than chrome: category glyphs in
- * the ledger and the picker, where the variety is the point.
+ * the transactions list and the picker, where the variety is the point.
  *
  * Paths follow the Lucide geometry (24×24 box, 2px stroke, round caps) so the
  * whole set shares one optical weight.

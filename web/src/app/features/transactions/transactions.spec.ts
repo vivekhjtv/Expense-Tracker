@@ -5,7 +5,7 @@ import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Transaction } from '../../core/models/transaction.model';
 import { TransactionService } from '../../core/services/transaction.service';
-import { Ledger } from './ledger';
+import { Transactions } from './transactions';
 
 const tx = (over: Partial<Transaction>): Transaction =>
   ({
@@ -28,8 +28,8 @@ const isoDaysAgo = (days: number): string => {
   return d.toISOString();
 };
 
-describe('Ledger', () => {
-  let fixture: ComponentFixture<Ledger>;
+describe('Transactions', () => {
+  let fixture: ComponentFixture<Transactions>;
   let component: any;
   let list: ReturnType<typeof vi.fn>;
 
@@ -42,7 +42,7 @@ describe('Ledger', () => {
     );
 
     await TestBed.configureTestingModule({
-      imports: [Ledger],
+      imports: [Transactions],
       providers: [
         provideZonelessChangeDetection(),
         provideRouter([]),
@@ -53,7 +53,7 @@ describe('Ledger', () => {
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(Ledger);
+    fixture = TestBed.createComponent(Transactions);
     component = fixture.componentInstance;
     fixture.detectChanges();
   };
@@ -147,6 +147,76 @@ describe('Ledger', () => {
       component.setPaymentMode('CASH');
       component.resetFilters();
       expect(component.activeFilterCount()).toBe(0);
+    });
+  });
+
+  describe('active filter chips', () => {
+    const settle = () => new Promise((r) => setTimeout(r, 320));
+
+    it('lists one chip per applied filter, so nothing narrows the list invisibly', async () => {
+      await setup([]);
+      expect(component.activeFilters()).toEqual([]);
+
+      component.setPaymentMode('CASH');
+      component.setRange('LAST_MONTH');
+      component.filters.patchValue({ category: 'FUEL', search: 'dmart' });
+      await settle();
+
+      expect(component.activeFilters().map((c: any) => c.key)).toEqual([
+        'range',
+        'paymentMode',
+        'category',
+        'search',
+      ]);
+      expect(component.activeFilters().map((c: any) => c.label)).toEqual([
+        'Last month',
+        'Cash',
+        'Fuel',
+        '\u201Cdmart\u201D',
+      ]);
+    });
+
+    it('clearing one chip leaves the other filters in place', async () => {
+      await setup([]);
+      component.setPaymentMode('CASH');
+      component.filters.patchValue({ category: 'FUEL' });
+      await settle();
+
+      component.clearFilter('paymentMode');
+      await settle();
+
+      const q = list.mock.calls.at(-1)![0];
+      expect(q).not.toHaveProperty('paymentMode');
+      expect(q.category).toBe('FUEL');
+      expect(component.activeFilters().map((c: any) => c.key)).toEqual(['category']);
+    });
+
+    it('clearing the period chip drops the custom dates with it', async () => {
+      await setup([]);
+      component.setRange('CUSTOM');
+      component.filters.patchValue({ from: '2026-03-01', to: '2026-03-31' });
+      await settle();
+      expect(component.activeFilters()[0].label).toContain('Mar');
+
+      component.clearFilter('range');
+      await settle();
+
+      const q = list.mock.calls.at(-1)![0];
+      expect(q.range).toBe('THIS_MONTH');
+      expect(q).not.toHaveProperty('from');
+      expect(q).not.toHaveProperty('to');
+      expect(component.activeFilters()).toEqual([]);
+    });
+
+    it('clearing a chip returns to page 1', async () => {
+      await setup([]);
+      component.setPaymentMode('CASH');
+      component.page.set(3);
+      await settle();
+
+      component.clearFilter('paymentMode');
+      await settle();
+      expect(list.mock.calls.at(-1)![0].page).toBe(1);
     });
   });
 

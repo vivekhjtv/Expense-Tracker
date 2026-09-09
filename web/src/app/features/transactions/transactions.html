@@ -1,4 +1,4 @@
-<app-header title="Ledger" [showThemeToggle]="true">
+<app-header title="Transactions" [showThemeToggle]="true">
   <button
     type="button"
     (click)="showFilters.set(!showFilters())"
@@ -36,6 +36,38 @@
         }
         {{ option.label }}
       </button>
+    }
+  </div>
+
+  <!-- Active filter chips.
+
+       The panel's "Clear filters" button disappears with the panel, so a
+       filter applied and then collapsed left nothing on screen to undo it.
+       These sit in the header for as long as a filter is on, and each chip
+       removes only itself. Wrapped in a plain div because a bare @if block
+       does not match a projection slot. -->
+  <div slot="below">
+    @if (activeFilters().length) {
+      <div
+        class="flex items-center gap-1.5 overflow-x-auto px-4 pb-2.5"
+        role="group"
+        aria-label="Active filters"
+      >
+        @for (chip of activeFilters(); track chip.key) {
+          <button
+            type="button"
+            (click)="clearFilter(chip.key)"
+            [attr.aria-label]="'Remove filter: ' + chip.label"
+            class="chip chip-accent shrink-0 px-2.5"
+          >
+            {{ chip.label }}
+            <app-icon name="close" [size]="13" />
+          </button>
+        }
+        <button type="button" (click)="resetFilters()" class="chip shrink-0 px-2.5 text-fg-muted">
+          Clear all
+        </button>
+      </div>
     }
   </div>
 </app-header>

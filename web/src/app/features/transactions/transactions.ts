@@ -27,6 +27,14 @@ import { InrPipe } from '../../shared/pipes/inr.pipe';
 import { AppHeader } from '../../shared/components/app-header/app-header';
 import { Icon } from '../../shared/components/icon/icon';
 
+/** A filter that is currently narrowing the list, rendered as a removable chip. */
+type FilterKey = 'range' | 'paymentMode' | 'category' | 'search';
+
+interface ActiveFilter {
+  key: FilterKey;
+  label: string;
+}
+
 interface DayGroup {
   date: string;
   label: string;
@@ -45,12 +53,12 @@ const RANGES = [
 ] as const;
 
 @Component({
-  selector: 'app-ledger',
+  selector: 'app-transactions',
   imports: [ReactiveFormsModule, RouterLink, InrPipe, AppHeader, Icon],
-  templateUrl: './ledger.html',
+  templateUrl: './transactions.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class Ledger {
+export class Transactions {
   private readonly fb = inject(FormBuilder);
   private readonly transactionService = inject(TransactionService);
   private readonly toast = inject(ToastService);
@@ -131,15 +139,39 @@ export class Ledger {
   protected readonly meta = computed(() => this.result()?.meta ?? null);
   protected readonly transactions = computed(() => this.result()?.data ?? []);
 
-  protected readonly activeFilterCount = computed(() => {
+  /**
+   * What is currently narrowing the list, as removable chips.
+   *
+   * The panel's "Clear filters" button only exists while the panel is OPEN,
+   * so once it was collapsed a filter could keep hiding rows with nothing
+   * on screen saying so or offering to undo it. These chips live in the
+   * header, always visible, and each one clears just its own filter.
+   */
+  protected readonly activeFilters = computed<ActiveFilter[]>(() => {
     const f = this.filterValue();
-    let count = 0;
-    if (f.paymentMode) count++;
-    if (f.category) count++;
-    if (f.search?.trim()) count++;
-    if (f.range !== DateRangePreset.THIS_MONTH) count++;
-    return count;
+    const chips: ActiveFilter[] = [];
+
+    if (f.range !== DateRangePreset.THIS_MONTH) {
+      chips.push({ key: 'range', label: this.rangeLabel(f.range, f.from, f.to) });
+    }
+    if (f.paymentMode) {
+      chips.push({
+        key: 'paymentMode',
+        label: f.paymentMode === PaymentMode.CASH ? 'Cash' : 'Online',
+      });
+    }
+    if (f.category) {
+      chips.push({ key: 'category', label: categoryMeta(f.category).label });
+    }
+    const search = f.search?.trim();
+    if (search) {
+      chips.push({ key: 'search', label: `\u201C${search}\u201D` });
+    }
+
+    return chips;
   });
+
+  protected readonly activeFilterCount = computed(() => this.activeFilters().length);
 
   protected readonly isCustomRange = computed(
     () => this.filterValue().range === DateRangePreset.CUSTOM,
@@ -195,6 +227,28 @@ export class Ledger {
 
   protected setPaymentMode(mode: PaymentMode | ''): void {
     this.filters.controls.paymentMode.setValue(mode);
+    this.page.set(1);
+  }
+
+  /** Removes one filter, leaving the rest in place. */
+  protected clearFilter(key: FilterKey): void {
+    switch (key) {
+      case 'range':
+        // Silently, so the custom dates do not fire a request of their own on
+        // the way back to the preset.
+        this.filters.patchValue({ from: '', to: '' }, { emitEvent: false });
+        this.filters.controls.range.setValue(DateRangePreset.THIS_MONTH);
+        break;
+      case 'paymentMode':
+        this.filters.controls.paymentMode.setValue('');
+        break;
+      case 'category':
+        this.filters.controls.category.setValue('');
+        break;
+      case 'search':
+        this.filters.controls.search.setValue('');
+        break;
+    }
     this.page.set(1);
   }
 
@@ -255,6 +309,23 @@ export class Ledger {
 
   protected time(iso: string): string {
     return new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  private rangeLabel(
+    range: DateRangePreset | undefined,
+    from: string | undefined,
+    to: string | undefined,
+  ): string {
+    if (range === DateRangePreset.CUSTOM && (from || to)) {
+      const short = (value: string) =>
+        new Date(`${value}T12:00:00`).toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+        });
+      if (from && to) return `${short(from)} – ${short(to)}`;
+      return from ? `From ${short(from)}` : `Until ${short(to!)}`;
+    }
+    return RANGES.find((option) => option.value === range)?.label ?? 'Custom';
   }
 
   private dayLabel(date: Date): string {
