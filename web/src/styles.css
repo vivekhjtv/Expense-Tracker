@@ -71,8 +71,18 @@ input[type='number'] {
   -moz-appearance: textfield;
 }
 
-/* The native date picker indicator is tiny; widen its hit area to the
-   whole field so the control meets a touch target size. */
+/* The native date picker indicator is tiny; stretch its hit area over the
+   whole field so the control meets a touch target size.
+
+   `position: relative` on the INPUT is load-bearing. Without it the absolutely
+   positioned indicator resolves against the nearest positioned ancestor
+   instead of its own field, so two date inputs side by side both stretch their
+   invisible overlay across the shared container — and the one later in the DOM
+   covers the other. Tapping "From" then opens the "To" picker. */
+input[type='date'] {
+  position: relative;
+}
+
 input[type='date']::-webkit-calendar-picker-indicator {
   position: absolute;
   inset: 0;

@@ -171,6 +171,21 @@ const expense = (over = {}) => ({
     const custom = (await req('GET', '/transactions?range=CUSTOM&from=2026-09-05&to=2026-09-06&limit=100')).body;
     check('custom range is inclusive of both days', custom.meta.total >= 2, `got ${custom.meta.total}`);
 
+    // The client sends local-noon instants, not bare date strings.
+    const isoRange = (await req('GET',
+      '/transactions?range=CUSTOM&from=2026-09-05T12:00:00.000%2B05:30&to=2026-09-06T12:00:00.000%2B05:30&tzOffset=330&limit=100')).body;
+    eq('accepts ISO instants for a custom range', isoRange.meta.total, custom.meta.total);
+
+    const singleDay = (await req('GET',
+      '/transactions?range=CUSTOM&from=2026-09-05T12:00:00.000%2B05:30&to=2026-09-05T12:00:00.000%2B05:30&tzOffset=330&limit=100')).body;
+    check('a one-day custom range includes that whole day',
+      singleDay.data.every((t) => t.date.startsWith('2026-09-05')) && singleDay.meta.total > 0,
+      `got ${singleDay.meta.total} rows`);
+
+    const backwards = (await req('GET',
+      '/transactions?range=CUSTOM&from=2026-09-20&to=2026-09-01&limit=100')).body;
+    eq('a reversed range returns nothing rather than erroring', backwards.meta.total, 0);
+
     console.log('\n=== analytics agree with the ledger ===');
     const dash = (await req('GET', '/analytics/dashboard?range=ALL')).body;
     const s = dash.summary;

@@ -120,7 +120,11 @@ describe('Ledger', () => {
 
       component.setRange('CUSTOM');
       await new Promise((r) => setTimeout(r, 320));
-      expect(list.mock.calls.at(-1)![0]).toMatchObject({ from: '2026-01-01', to: '2026-01-31' });
+      const q = list.mock.calls.at(-1)![0];
+      // Sent as local-noon instants rather than bare date strings, so the
+      // range cannot shift a day in a negative-offset timezone.
+      expect(new Date(q.from).getDate()).toBe(1);
+      expect(new Date(q.to).getDate()).toBe(31);
     });
 
     it('resets back to defaults', async () => {
@@ -128,6 +132,177 @@ describe('Ledger', () => {
       component.setPaymentMode('CASH');
       component.resetFilters();
       expect(component.activeFilterCount()).toBe(0);
+    });
+  });
+
+  describe('custom date range', () => {
+    const settle = () => new Promise((r) => setTimeout(r, 320));
+
+    it('sends BOTH from and to, each to its own field', async () => {
+      // The reported bug: picking "From" landed the value in "To".
+      await setup([]);
+      component.setRange('CUSTOM');
+      component.filters.patchValue({ from: '2026-03-01', to: '2026-03-31' });
+      await settle();
+
+      const q = list.mock.calls.at(-1)![0];
+      expect(q.from).toBeTruthy();
+      expect(q.to).toBeTruthy();
+      expect(new Date(q.from).getDate()).toBe(1);
+      expect(new Date(q.to).getDate()).toBe(31);
+    });
+
+    it('sends dates as local-noon instants, not bare date strings', async () => {
+      // A bare "YYYY-MM-DD" parses as midnight UTC, which is the previous day
+      // west of Greenwich — the range would silently shift for those users.
+      await setup([]);
+      component.setRange('CUSTOM');
+      component.filters.patchValue({ from: '2026-03-05', to: '2026-03-06' });
+      await settle();
+
+      const q = list.mock.calls.at(-1)![0];
+      expect(q.from).toMatch(/T/);
+      expect(new Date(q.from).getDate()).toBe(5);
+      expect(new Date(q.from).getHours()).toBe(12);
+    });
+
+    it('allows an open-ended range with only one side filled', async () => {
+      await setup([]);
+      component.setRange('CUSTOM');
+      component.filters.patchValue({ from: '2026-03-01', to: '' });
+      await settle();
+
+      const q = list.mock.calls.at(-1)![0];
+      expect(q.from).toBeTruthy();
+      expect(q).not.toHaveProperty('to');
+    });
+
+    it('flags a reversed range instead of silently returning nothing', async () => {
+      await setup([]);
+      component.setRange('CUSTOM');
+      component.filters.patchValue({ from: '2026-03-31', to: '2026-03-01' });
+      expect(component.rangeIsBackwards()).toBe(true);
+
+      component.filters.patchValue({ from: '2026-03-01', to: '2026-03-31' });
+      expect(component.rangeIsBackwards()).toBe(false);
+    });
+
+    it('does not flag a range that is merely incomplete', async () => {
+      await setup([]);
+      component.setRange('CUSTOM');
+      component.filters.patchValue({ from: '2026-03-31', to: '' });
+      expect(component.rangeIsBackwards()).toBe(false);
+    });
+
+    it('stops sending custom dates when a preset is chosen again', async () => {
+      await setup([]);
+      component.setRange('CUSTOM');
+      component.filters.patchValue({ from: '2026-03-01', to: '2026-03-31' });
+      await settle();
+      expect(list.mock.calls.at(-1)![0].from).toBeTruthy();
+
+      component.setRange('THIS_WEEK');
+      await settle();
+      const q = list.mock.calls.at(-1)![0];
+      expect(q.range).toBe('THIS_WEEK');
+      expect(q).not.toHaveProperty('from');
+      expect(q).not.toHaveProperty('to');
+    });
+  });
+
+  describe('every filter reaches the API', () => {
+    const settle = () => new Promise((r) => setTimeout(r, 320));
+
+    it('period presets', async () => {
+      await setup([]);
+      for (const range of ['TODAY', 'YESTERDAY', 'THIS_WEEK', 'THIS_MONTH', 'LAST_MONTH', 'ALL']) {
+        component.setRange(range);
+        await settle();
+        expect(list.mock.calls.at(-1)![0].range).toBe(range);
+      }
+    });
+
+    it('payment mode, including back to All', async () => {
+      await setup([]);
+      component.setPaymentMode('CASH');
+      await settle();
+      expect(list.mock.calls.at(-1)![0].paymentMode).toBe('CASH');
+
+      component.setPaymentMode('ONLINE_BANKING');
+      await settle();
+      expect(list.mock.calls.at(-1)![0].paymentMode).toBe('ONLINE_BANKING');
+
+      // "All" must REMOVE the filter, not send an empty string.
+      component.setPaymentMode('');
+      await settle();
+      expect(list.mock.calls.at(-1)![0]).not.toHaveProperty('paymentMode');
+    });
+
+    it('category', async () => {
+      await setup([]);
+      component.filters.patchValue({ category: 'FUEL' });
+      await settle();
+      expect(list.mock.calls.at(-1)![0].category).toBe('FUEL');
+    });
+
+    it('search, trimmed', async () => {
+      await setup([]);
+      component.filters.patchValue({ search: '  DMart  ' });
+      await settle();
+      expect(list.mock.calls.at(-1)![0].search).toBe('DMart');
+    });
+
+    it('a whitespace-only search is not a filter', async () => {
+      await setup([]);
+      component.filters.patchValue({ search: '   ' });
+      await settle();
+      expect(list.mock.calls.at(-1)![0]).not.toHaveProperty('search');
+    });
+
+    it('filters combine rather than replace each other', async () => {
+      await setup([]);
+      component.setPaymentMode('CASH');
+      component.filters.patchValue({ category: 'GROCERIES', search: 'milk' });
+      component.setRange('LAST_MONTH');
+      await settle();
+
+      expect(list.mock.calls.at(-1)![0]).toMatchObject({
+        paymentMode: 'CASH', category: 'GROCERIES', search: 'milk', range: 'LAST_MONTH',
+      });
+    });
+
+    it('always sends the device timezone offset', async () => {
+      await setup([]);
+      // Without it the server computes "Today" in UTC and drops late-night spends.
+      component.setRange('TODAY');
+      await settle();
+      expect(list.mock.calls.at(-1)![0]).toBeDefined();
+    });
+
+    it('clearing resets every filter and the page', async () => {
+      await setup([]);
+      component.setPaymentMode('CASH');
+      component.filters.patchValue({ category: 'FUEL', search: 'x', from: '2026-01-01' });
+      component.nextPage?.();
+      component.resetFilters();
+      await settle();
+
+      const q = list.mock.calls.at(-1)![0];
+      expect(q.range).toBe('THIS_MONTH');
+      expect(q.page).toBe(1);
+      expect(q).not.toHaveProperty('paymentMode');
+      expect(q).not.toHaveProperty('category');
+      expect(q).not.toHaveProperty('search');
+      expect(component.activeFilterCount()).toBe(0);
+    });
+
+    it('changing a filter returns to page 1', async () => {
+      await setup([]);
+      component.page.set(3);
+      await settle();
+      component.setPaymentMode('CASH');
+      await settle();
+      expect(list.mock.calls.at(-1)![0].page).toBe(1);
     });
   });
 

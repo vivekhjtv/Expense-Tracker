@@ -68,15 +68,34 @@
     </div>
 
     @if (isCustomRange()) {
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <label for="from" class="label">From</label>
-          <input id="from" type="date" formControlName="from" class="field tap" />
+      <div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label for="filter-from" class="label">From</label>
+            <input
+              id="filter-from"
+              type="date"
+              formControlName="from"
+              [max]="filters.controls.to.value || null"
+              class="field tap"
+            />
+          </div>
+          <div>
+            <label for="filter-to" class="label">To</label>
+            <input
+              id="filter-to"
+              type="date"
+              formControlName="to"
+              [min]="filters.controls.from.value || null"
+              class="field tap"
+            />
+          </div>
         </div>
-        <div>
-          <label for="to" class="label">To</label>
-          <input id="to" type="date" formControlName="to" class="field tap" />
-        </div>
+        @if (rangeIsBackwards()) {
+          <p class="mt-1.5 text-xs font-medium text-spend-600">
+            "From" is after "To", so nothing can match. Swap the dates.
+          </p>
+        }
       </div>
     }
 

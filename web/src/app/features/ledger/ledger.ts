@@ -8,6 +8,7 @@ import { Paginated, Transaction } from '../../core/models/transaction.model';
 import { ToastService } from '../../core/services/toast.service';
 import { TransactionQuery, TransactionService } from '../../core/services/transaction.service';
 import { EXPENSE_CATEGORIES } from '../../core/models/enums';
+import { toIsoFromDateInput } from '../../core/utils/date.util';
 import { InrPipe } from '../../shared/pipes/inr.pipe';
 
 interface DayGroup {
@@ -125,6 +126,15 @@ export class Ledger {
   protected readonly isCustomRange = computed(
     () => this.filterValue().range === DateRangePreset.CUSTOM,
   );
+
+  /**
+   * A reversed range returns nothing, which looks like a broken filter rather
+   * than a mistake. Say so instead of showing a bare empty state.
+   */
+  protected readonly rangeIsBackwards = computed(() => {
+    const { range, from, to } = this.filterValue();
+    return range === DateRangePreset.CUSTOM && !!from && !!to && from > to;
+  });
 
   /**
    * Groups rows under day headers.
@@ -246,8 +256,12 @@ export class Ledger {
     const isCustom = filters.range === DateRangePreset.CUSTOM;
     return {
       range: filters.range,
-      ...(isCustom && filters.from ? { from: filters.from } : {}),
-      ...(isCustom && filters.to ? { to: filters.to } : {}),
+      // Sent as a local-noon instant, not the bare "YYYY-MM-DD".
+      // A date-only string parses as midnight UTC, which is the PREVIOUS day
+      // in any timezone west of Greenwich — so a custom range would silently
+      // shift by a day for those users. Noon is far from both midnights.
+      ...(isCustom && filters.from ? { from: toIsoFromDateInput(filters.from) } : {}),
+      ...(isCustom && filters.to ? { to: toIsoFromDateInput(filters.to) } : {}),
       ...(filters.paymentMode ? { paymentMode: filters.paymentMode } : {}),
       ...(filters.category ? { category: filters.category } : {}),
       ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
