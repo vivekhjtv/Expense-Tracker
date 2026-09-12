@@ -272,6 +272,21 @@ input[type='date']::-webkit-calendar-picker-indicator {
 .field::placeholder {
   color: var(--color-fg-subtle);
 }
+
+/* Date inputs are the one control whose native widget has a mind of its own.
+   iOS especially gives it an intrinsic width and centres the value inside a
+   shadow element, which can push it past the card it sits in — `w-full` alone
+   does not stop that, because an intrinsic minimum wins over a percentage
+   width. Clamping it here fixes the overflow without `appearance: none`,
+   which would throw away the native calendar picker along with the problem. */
+input[type='date'].field {
+  min-width: 0;
+  max-width: 100%;
+}
+input[type='date'].field::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
 .field:focus {
   background-color: var(--color-card);
   border-color: var(--color-accent);
