@@ -1,0 +1,170 @@
+<!--
+  Milk.
+
+  One screen: record a day at the top, see the month underneath. The calendar
+  is the history — a gap in the grid is a day nobody logged, which a list of
+  rows would never make obvious.
+-->
+
+<app-header
+  title="Milk"
+  [subtitle]="summary() ? summary()!.totalLitres + ' L in ' + monthLabel() : null"
+  [showThemeToggle]="true"
+/>
+
+<div class="space-y-3 p-3">
+  <!-- Record a day ---------------------------------------------------- -->
+  <section class="card p-4" aria-labelledby="record-label">
+    <span class="label" id="record-label">How much today?</span>
+
+    <label for="milk-date" class="sr-only">Date</label>
+    <input
+      id="milk-date"
+      type="date"
+      [value]="selectedDate()"
+      [max]="today"
+      (change)="onDateInput($event)"
+      class="field tap"
+    />
+
+    <!-- Tapping a quantity saves it. The write is an upsert, so the wrong
+         tap is corrected by the right one — no confirm step to sit through
+         every single day. -->
+    <div class="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Quantity in litres">
+      @for (option of quantities; track option.value) {
+        <button
+          type="button"
+          (click)="record(option.value)"
+          [disabled]="saving()"
+          [attr.aria-pressed]="selectedQuantity() === option.value"
+          class="tap rounded-xl border py-2.5 text-sm font-semibold transition disabled:opacity-60"
+          [class]="
+            selectedQuantity() === option.value
+              ? 'border-accent bg-accent-soft text-accent-fg'
+              : 'border-line bg-sunken text-fg-muted active:bg-hover'
+          "
+        >
+          {{ option.label }}
+        </button>
+      }
+    </div>
+
+    <p class="mt-3 flex min-h-6 items-center justify-between gap-3 text-xs">
+      @if (!selectionIsVisible()) {
+        <!-- The calendar has been paged to another month, so whether this day
+             holds an entry is simply not known here — claiming "nothing
+             recorded" would be a guess, and a wrong one often enough. -->
+        <span class="text-fg-subtle">{{ selectedLabel() }} is not in {{ monthLabel() }}.</span>
+        <button
+          type="button"
+          (click)="showSelectedMonth()"
+          class="tap shrink-0 px-2 font-semibold text-accent-fg"
+        >
+          Show it
+        </button>
+      } @else if (selectedQuantity(); as litres) {
+        <span class="text-fg-muted">
+          <strong class="font-semibold text-fg">{{ litres }} L</strong> on {{ selectedLabel() }}
+        </span>
+        <button
+          type="button"
+          (click)="removeSelected()"
+          [disabled]="saving()"
+          class="tap shrink-0 px-2 font-semibold text-fg-subtle active:text-spend disabled:opacity-60"
+        >
+          Remove
+        </button>
+      } @else {
+        <span class="text-fg-subtle"> Nothing recorded for {{ selectedLabel() }} yet. </span>
+      }
+    </p>
+  </section>
+
+  <!-- The month ------------------------------------------------------- -->
+  <section class="card p-4" aria-labelledby="calendar-label">
+    <div class="mb-3 flex items-center justify-between gap-2">
+      <button
+        type="button"
+        (click)="prevMonth()"
+        aria-label="Previous month"
+        class="tap flex size-9 shrink-0 items-center justify-center rounded-lg text-fg-muted active:bg-hover"
+      >
+        <app-icon name="chevron-left" [size]="18" />
+      </button>
+
+      <h2 id="calendar-label" class="text-sm font-bold text-fg" aria-live="polite">
+        {{ monthLabel() }}
+      </h2>
+
+      <button
+        type="button"
+        (click)="nextMonth()"
+        [disabled]="!canGoNext()"
+        aria-label="Next month"
+        class="tap flex size-9 shrink-0 items-center justify-center rounded-lg text-fg-muted active:bg-hover disabled:opacity-30"
+      >
+        <app-icon name="chevron-right" [size]="18" />
+      </button>
+    </div>
+
+    @if (failed()) {
+      <p class="py-6 text-center text-sm text-fg-muted">Could not load this month.</p>
+    } @else {
+      <div class="grid grid-cols-7 gap-1" aria-hidden="true">
+        @for (weekday of weekdays; track $index) {
+          <span class="pb-1 text-center text-[10px] font-bold text-fg-subtle">{{ weekday }}</span>
+        }
+      </div>
+
+      <div class="grid grid-cols-7 gap-1" [class.opacity-50]="loading()">
+        @for (cell of cells(); track $index) {
+          @if (cell) {
+            <button
+              type="button"
+              (click)="selectDay(cell.date)"
+              [disabled]="cell.isFuture"
+              [attr.aria-pressed]="selectedDate() === cell.date"
+              [attr.aria-label]="
+                cell.day + ': ' + (cell.quantity ? cell.quantity + ' litres' : 'nothing recorded')
+              "
+              class="tap flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg border text-[11px] transition disabled:opacity-25"
+              [class]="cellClass(cell)"
+            >
+              <span>{{ cell.day }}</span>
+              <!-- The litres, not a dot: the point of the grid is seeing how
+                   much, not merely whether. -->
+              <span class="money text-[10px] leading-none font-bold">
+                {{ cell.quantity !== null ? cell.quantity : '·' }}
+              </span>
+            </button>
+          } @else {
+            <span></span>
+          }
+        }
+      </div>
+
+      @if (summary(); as stats) {
+        <dl class="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-3 text-center">
+          <div>
+            <dt class="text-[10px] font-bold tracking-wide text-fg-subtle uppercase">Total</dt>
+            <dd class="money text-base font-bold text-fg">{{ stats.totalLitres }} L</dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-bold tracking-wide text-fg-subtle uppercase">Days</dt>
+            <dd class="money text-base font-bold text-fg">{{ stats.daysRecorded }}</dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-bold tracking-wide text-fg-subtle uppercase">Average</dt>
+            <dd class="money text-base font-bold text-fg">{{ stats.averageLitres }} L</dd>
+          </div>
+        </dl>
+      }
+
+      @if (!isCurrentMonth()) {
+        <button type="button" (click)="goToThisMonth()" class="btn-quiet mt-3 w-full">
+          Back to this month
+        </button>
+      }
+    }
+  </section>
+</div>

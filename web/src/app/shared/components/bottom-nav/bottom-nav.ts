@@ -45,7 +45,7 @@ interface NavItem {
       style="padding-bottom: env(safe-area-inset-bottom)"
       aria-label="Primary"
     >
-      <div class="mx-auto grid max-w-md grid-cols-3 px-2 py-1.5">
+      <div class="mx-auto grid max-w-md grid-cols-4 px-2 py-1.5">
         @for (item of items; track item.path) {
           <a
             [routerLink]="item.path"
@@ -110,6 +110,7 @@ export class BottomNav {
   protected readonly items: NavItem[] = [
     { path: '/', label: 'Home', icon: 'chart', exact: true },
     { path: '/transactions', label: 'Transactions', icon: 'receipt', exact: false },
+    { path: '/milk', label: 'Milk', icon: 'milk', exact: false },
     { path: '/settings', label: 'More', icon: 'sliders', exact: false },
   ];
 }

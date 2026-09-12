@@ -44,6 +44,12 @@ export const routes: Routes = [
   // there still lands in the right place.
   { path: 'ledger', pathMatch: 'full', redirectTo: 'transactions' },
   {
+    path: 'milk',
+    title: 'Milk · Expense Tracker',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/milk/milk').then((m) => m.Milk),
+  },
+  {
     path: 'settings',
     title: 'More · Expense Tracker',
     canActivate: [authGuard],

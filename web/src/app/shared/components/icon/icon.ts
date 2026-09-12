@@ -19,6 +19,7 @@ export type IconName =
   | 'close'
   | 'logout'
   | 'cash'
+  | 'milk'
   | 'phone'
   | 'sparkle'
   | 'alert'
@@ -134,6 +135,13 @@ export type IconName =
           <rect x="2" y="6" width="20" height="12" rx="2" />
           <circle cx="12" cy="12" r="2.5" />
           <path d="M6 12h.01M18 12h.01" />
+        }
+        @case ('milk') {
+          <!-- A milk carton: the gable top is what makes it read as milk at
+               21px, where a bottle silhouette turns into a vase. -->
+          <path d="M8 8.5 12 3l4 5.5" />
+          <path d="M6.5 8.5h11V20a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" />
+          <path d="M9.5 13h5" />
         }
         @case ('phone') {
           <rect x="6" y="2" width="12" height="20" rx="2.5" />

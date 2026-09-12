@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { IndexInitializer } from './index-initializer.service';
+import { MilkEntry, MilkEntrySchema } from './schemas/milk-entry.schema';
 import { Transaction, TransactionSchema } from './schemas/transaction.schema';
 
 const logger = new Logger('Database');
@@ -40,7 +41,10 @@ const logger = new Logger('Database');
         },
       }),
     }),
-    MongooseModule.forFeature([{ name: Transaction.name, schema: TransactionSchema }]),
+    MongooseModule.forFeature([
+      { name: Transaction.name, schema: TransactionSchema },
+      { name: MilkEntry.name, schema: MilkEntrySchema },
+    ]),
   ],
   providers: [IndexInitializer],
   exports: [MongooseModule],

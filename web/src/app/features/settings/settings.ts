@@ -110,5 +110,6 @@ export class Settings {
       hint: 'Search and filter everything',
     },
     { path: '/', label: 'Dashboard', icon: 'chart', hint: 'Charts and totals' },
+    { path: '/milk', label: 'Milk log', icon: 'milk', hint: 'How much milk, day by day' },
   ];
 }

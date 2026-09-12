@@ -213,6 +213,39 @@ const expense = (over = {}) => ({
     eq('still emits both payment modes', empty.paymentModes.length, 2);
     eq('no top category', empty.summary.topCategory, null);
 
+    console.log('\n=== milk log ===');
+    eq('records a day', (await req('PUT', '/milk', { date: '2026-09-03', quantity: 1 })).status, 200);
+    eq('half litres are allowed', (await req('PUT', '/milk', { date: '2026-09-04', quantity: 0.5 })).body.quantity, 0.5);
+    await req('PUT', '/milk', { date: '2026-09-05', quantity: 2.5 });
+
+    // The same day twice must CORRECT the figure, not add a second row.
+    eq('re-recording a day overwrites it', (await req('PUT', '/milk', { date: '2026-09-03', quantity: 1.5 })).body.quantity, 1.5);
+    let month = (await req('GET', '/milk?month=2026-09')).body;
+    eq('still one row for that day', month.entries.filter(e => e.date === '2026-09-03').length, 1);
+
+    eq('month totals the litres', month.summary.totalLitres, 4.5);
+    eq('and counts the days', month.summary.daysRecorded, 3);
+    eq('average per recorded day', month.summary.averageLitres, 1.5);
+    check('entries come back oldest first',
+      month.entries.every((e, i, a) => i === 0 || a[i - 1].date <= e.date));
+
+    eq('another month is empty', (await req('GET', '/milk?month=2026-08')).body.summary.daysRecorded, 0);
+    eq('an empty month averages 0, not NaN', (await req('GET', '/milk?month=2026-08')).body.summary.averageLitres, 0);
+
+    eq('quarter litres snap to the nearest half', (await req('PUT', '/milk', { date: '2026-09-06', quantity: 1.3 })).body.quantity, 1.5);
+    eq('zero litres -> 400', (await req('PUT', '/milk', { date: '2026-09-07', quantity: 0 })).status, 400);
+    eq('negative litres -> 400', (await req('PUT', '/milk', { date: '2026-09-07', quantity: -1 })).status, 400);
+    eq('a day that does not exist -> 400', (await req('PUT', '/milk', { date: '2026-02-31', quantity: 1 })).status, 400);
+    eq('a malformed day -> 400', (await req('PUT', '/milk', { date: '03/09/2026', quantity: 1 })).status, 400);
+    eq('a malformed month -> 400', (await req('GET', '/milk?month=2026-9')).status, 400);
+
+    eq('removes a day', (await req('DELETE', '/milk/2026-09-06')).status, 200);
+    eq('removing it again -> 404', (await req('DELETE', '/milk/2026-09-06')).status, 404);
+    month = (await req('GET', '/milk?month=2026-09')).body;
+    eq('and it is gone from the month', month.summary.totalLitres, 4.5);
+
+    eq('milk without a token -> 401', (await req('GET', '/milk', null, null)).status, 401);
+
     console.log('\n=== data is scoped to the signed-in user ===');
     const other = await req('POST', '/auth/register',
       { name: 'Someone Else', email: 'other@example.com', password: 'a different password' }, null);
@@ -232,6 +265,16 @@ const expense = (over = {}) => ({
       (await req('DELETE', `/transactions/${myRow._id}`, null, otherToken)).status, 404);
     eq('their dashboard is empty',
       (await req('GET', '/analytics/summary?range=ALL', null, otherToken)).body.totalSpend, 0);
+    eq('a new user sees no milk',
+      (await req('GET', '/milk?month=2026-09', null, otherToken)).body.summary.daysRecorded, 0);
+    // Same day, different user: the unique index is per user, so this must
+    // be a separate row rather than a duplicate-key error or an overwrite.
+    eq('their milk on my day is their own',
+      (await req('PUT', '/milk', { date: '2026-09-03', quantity: 3 }, otherToken)).body.quantity, 3);
+    eq('mine is untouched',
+      (await req('GET', '/milk?month=2026-09')).body.entries.find(e => e.date === '2026-09-03').quantity, 1.5);
+    eq('cannot delete another user\'s milk day',
+      (await req('DELETE', '/milk/2026-09-04', null, otherToken)).status, 404);
     check('my data is untouched',
       (await req('GET', '/transactions?range=ALL&limit=100')).body.meta.total === mine);
 

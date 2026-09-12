@@ -50,6 +50,19 @@ Ledger query params: `range` (`TODAY`/`YESTERDAY`/`THIS_WEEK`/`THIS_MONTH`/`LAST
 **Always send `tzOffset`** from the client as `-new Date().getTimezoneOffset()` (330 for IST).
 Day boundaries are otherwise computed in UTC, which silently drops late-night spends from "Today".
 
+### Milk
+| | |
+|---|---|
+| `GET /api/milk?month=YYYY-MM` | One month of entries plus its totals. |
+| `PUT /api/milk` | `{ date: "YYYY-MM-DD", quantity }` — records or corrects a day. |
+| `DELETE /api/milk/:date` | Clears that day. |
+
+A day holds ONE quantity (unique index on `userId + date`), so `PUT` is
+idempotent and re-sending a day corrects it rather than adding a second row.
+`date` is a calendar-day STRING, never a `Date`: which day the milk arrived
+must not shift with a timezone. Quantities are litres, snapped to the nearest
+half.
+
 ### Analytics
 | | |
 |---|---|

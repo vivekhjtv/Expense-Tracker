@@ -7,6 +7,7 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { HealthController } from './modules/health.controller';
+import { MilkModule } from './modules/milk/milk.module';
 import { ReceiptModule } from './modules/receipts/receipt.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 
@@ -23,6 +24,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
     AuthModule,
     ReceiptModule,
     TransactionsModule,
+    MilkModule,
   ],
   controllers: [HealthController],
   providers: [

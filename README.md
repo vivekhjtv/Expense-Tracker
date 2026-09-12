@@ -70,6 +70,7 @@ See **[DEPLOY.md](DEPLOY.md)** — Angular on Vercel, NestJS on Render, step by 
 |---|---|
 | `/` | Dashboard — total spend, biggest spend, daily trend, category donut, cash vs online |
 | `/transactions` | Filterable history grouped by day, cash/online badges, expandable line items |
+| `/milk` | Daily milk log: tap a quantity for a day, see the whole month as a calendar |
 | `/add`, `/edit/:id` | Add a spend: amount, payment mode, category, optional line items, or scan a receipt |
 | `/settings` | Shortcuts and how it works |
 
