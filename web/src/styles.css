@@ -274,16 +274,23 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 /* Date inputs are the one control whose native widget has a mind of its own.
-   iOS especially gives it an intrinsic width and centres the value inside a
-   shadow element, which can push it past the card it sits in — `w-full` alone
-   does not stop that, because an intrinsic minimum wins over a percentage
-   width. Clamping it here fixes the overflow without `appearance: none`,
-   which would throw away the native calendar picker along with the problem. */
+   iOS sizes it to the formatted date it happens to be showing and ignores
+   `width: 100%` outright, so it grows straight out through the side of the
+   card. Resetting the appearance is what makes it lay out like any other
+   field — the clamps alone cannot win against intrinsic sizing.
+
+   The native picker is unaffected: on a phone it opens because the input's
+   TYPE is date, not because of the widget chrome, and Chrome's calendar
+   button is a separate shadow element that survives this. */
 input[type='date'].field {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
 }
 input[type='date'].field::-webkit-date-and-time-value {
+  /* iOS centres the value inside the widget and adds its own margins. */
   text-align: left;
   margin: 0;
 }
