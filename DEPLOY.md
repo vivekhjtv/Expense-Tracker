@@ -97,7 +97,54 @@ Multiple origins are comma-separated. Include a custom domain here too if you ad
 
 ---
 
-## 5. Verify
+## 5. Keep the API awake
+
+**Do this, or the app takes 30–60s to load.** Render's free tier suspends a web
+service after 15 minutes with no traffic. The next request has to start the
+container, boot Nest, connect to Atlas and build indexes before it can answer —
+so opening the app after a quiet spell looks broken, and *saving* a spend is just
+as slow.
+
+The fix is to knock on the door before you arrive: an external scheduler calls
+`/api/health` often enough that the service never goes to sleep. That endpoint is
+`@Public` (no token) and reads only the connection state (no database round
+trip), so the ping costs nothing.
+
+**[cron-job.org](https://cron-job.org)** — free, no credit card:
+
+| Field | Value |
+|---|---|
+| URL | `https://<your-api>.onrender.com/api/health` |
+| Timezone | `Asia/Kolkata` |
+| Schedule | minutes `0,10,20,30,40,50`, hours `6-23` |
+
+Then **Test run** — expect `200` with `{"status":"ok","database":"connected"}`.
+
+**Every 10 minutes**, because spin-down is at 15 — that leaves room for one
+missed ping.
+
+**Hours 6–23, not round the clock.** Render grants **750 instance-hours per
+workspace per month**, and a suspended service consumes none. Pinging 6am–midnight
+keeps it awake ~555 hours a month, comfortably inside the grant. Pinging 24/7
+costs ~730 of 750: it fits, but with no margin, and a second free web service in
+the same workspace would push the workspace over and suspend everything until the
+next month. The frontend is on Vercel and Render static sites don't consume
+instance hours, so this one API is the only thing spending them.
+
+The trade-off is honest: open the app at 3am and you wait the full cold start,
+because nothing pinged it. Widen the hours if that happens often.
+
+**Confirming it works:** Render's **Events** tab should stop showing
+"Service suspended" / "Service resumed" during the pinged hours. That is the
+direct proof, not a guess.
+
+If cron-job.org ever changes, any uptime monitor does the same job — UptimeRobot's
+free plan checks every 5 minutes, which is also inside the 15-minute window.
+Nothing in this repo depends on which one you use.
+
+---
+
+## 6. Verify
 
 1. Open the Vercel URL → you should land on the sign-in screen
 2. Create an account → you land on the dashboard
@@ -162,9 +209,9 @@ The API key is redacted from every log line and every response.
 
 ## Things to know
 
-**Render free tier sleeps** after ~15 minutes idle. The next request takes 30–60s to
-wake it, so the first load after a quiet spell feels broken. Fixes: upgrade to the paid
-instance, or ping `/api/health` on a schedule.
+**Render free tier sleeps** after ~15 minutes idle, and the next request pays 30–60s to
+wake it — for reads *and* writes. Section 5 sets up the free ping that prevents it. The
+alternative is a paid instance, which simply never sleeps.
 
 **Atlas free tier (M0)** is fine for personal use, but has no automated backups. If
 this data matters, take an occasional `mongodump`.
