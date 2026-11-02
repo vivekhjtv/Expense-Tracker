@@ -18,6 +18,7 @@ import {
 } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
+  CategoryMeta,
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
   PaymentMode,
@@ -25,11 +26,13 @@ import {
 } from '../../core/models/enums';
 import { ScannedReceipt } from '../../core/models/receipt.model';
 import { LineItem, TransactionPayload } from '../../core/models/transaction.model';
+import { CategoryService } from '../../core/services/category.service';
 import { ReceiptService } from '../../core/services/receipt.service';
 import { ToastService } from '../../core/services/toast.service';
 import { TransactionService } from '../../core/services/transaction.service';
 import { isFutureDate, toDateInputValue, toIsoFromDateInput } from '../../core/utils/date.util';
 import { multiplyMoney, roundMoney, sumMoney } from '../../core/utils/money.util';
+import { ICON_GROUPS, POPULAR_CATEGORY_ICONS } from '../../core/utils/category-icons.util';
 import { InrPipe } from '../../shared/pipes/inr.pipe';
 import { AppHeader } from '../../shared/components/app-header/app-header';
 import { Icon } from '../../shared/components/icon/icon';
@@ -56,6 +59,7 @@ export class AddExpense implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly transactionService = inject(TransactionService);
+  private readonly categoryService = inject(CategoryService);
   private readonly receiptService = inject(ReceiptService);
   private readonly toast = inject(ToastService);
 
@@ -64,6 +68,33 @@ export class AddExpense implements OnInit {
 
   protected readonly TransactionType = TransactionType;
   protected readonly PaymentMode = PaymentMode;
+
+  // Category management modals & state
+  protected readonly isCategoryListModalOpen = signal(false);
+  protected readonly isCategoryModalOpen = signal(false);
+  protected readonly editingCategory = signal<CategoryMeta | null>(null);
+  protected readonly categoryNameInput = signal('');
+  protected readonly categoryIconInput = signal('🏷️');
+  protected readonly categorySearchQuery = signal('');
+  protected readonly selectedIconGroupId = signal<string>('popular');
+
+  protected readonly iconGroups = ICON_GROUPS;
+  protected readonly popularIcons = POPULAR_CATEGORY_ICONS;
+
+  protected readonly isCategoryFormValid = computed(() => {
+    return this.categoryNameInput().trim().length >= 2;
+  });
+
+  protected readonly deletedCategoriesCount = computed(() => {
+    return this.categoryService.deletedCount();
+  });
+
+  protected readonly activeIconList = computed(() => {
+    const groupId = this.selectedIconGroupId();
+    if (groupId === 'popular') return this.popularIcons;
+    const group = this.iconGroups.find((g) => g.id === groupId);
+    return group ? group.emojis : this.popularIcons;
+  });
 
   /* ---------------------------------------------------------------- */
   /* Form                                                              */
@@ -115,8 +146,22 @@ export class AddExpense implements OnInit {
   protected readonly isIncome = computed(() => this.type() === TransactionType.INCOME);
 
   protected readonly categories = computed(() =>
-    this.isIncome() ? INCOME_CATEGORIES : EXPENSE_CATEGORIES,
+    this.isIncome()
+      ? this.categoryService.incomeCategories()
+      : this.categoryService.expenseCategories(),
   );
+
+  protected readonly filteredCategoriesForManager = computed(() => {
+    const q = this.categorySearchQuery().trim().toLowerCase();
+    const list = this.categories();
+    if (!q) return list;
+    return list.filter((c) => c.label.toLowerCase().includes(q) || c.icon.includes(q));
+  });
+
+  protected readonly selectedCategoryMeta = computed(() => {
+    const catVal = this.form.controls.category.value;
+    return this.categoryService.categoryMeta(catVal);
+  });
 
   protected readonly itemsTotal = computed(() =>
     sumMoney(
@@ -156,11 +201,114 @@ export class AddExpense implements OnInit {
     // Income and expense have different category sets, so a category from one
     // must not survive a switch to the other.
     this.form.controls.type.valueChanges.pipe(takeUntilDestroyed()).subscribe((type) => {
-      const valid = type === TransactionType.INCOME ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+      const valid =
+        type === TransactionType.INCOME
+          ? this.categoryService.incomeCategories()
+          : this.categoryService.expenseCategories();
       if (!valid.some((c) => c.value === this.form.controls.category.value)) {
         this.form.controls.category.setValue(valid[0].value, { emitEvent: false });
       }
     });
+  }
+
+  protected openCategoryListModal(): void {
+    this.categorySearchQuery.set('');
+    this.isCategoryListModalOpen.set(true);
+  }
+
+  protected closeCategoryListModal(): void {
+    this.isCategoryListModalOpen.set(false);
+    this.categorySearchQuery.set('');
+  }
+
+  protected openAddCategory(): void {
+    this.editingCategory.set(null);
+    this.categoryNameInput.set('');
+    this.categoryIconInput.set('🏷️');
+    this.selectedIconGroupId.set('popular');
+    this.isCategoryModalOpen.set(true);
+  }
+
+  protected startEditingCategory(category: CategoryMeta, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.editingCategory.set(category);
+    this.categoryNameInput.set(category.label);
+    this.categoryIconInput.set(category.icon);
+    this.selectedIconGroupId.set('popular');
+    this.isCategoryModalOpen.set(true);
+  }
+
+  protected closeCategoryModal(): void {
+    this.isCategoryModalOpen.set(false);
+    this.editingCategory.set(null);
+  }
+
+  protected selectEmoji(emoji: string): void {
+    this.categoryIconInput.set(emoji);
+  }
+
+  protected saveCategory(): void {
+    const name = this.categoryNameInput().trim();
+    const icon = this.categoryIconInput().trim() || '🏷️';
+    if (name.length < 2) {
+      this.toast.error('Category name must be at least 2 characters.');
+      return;
+    }
+
+    const editing = this.editingCategory();
+    if (editing) {
+      this.categoryService.updateCategory(editing.value, { label: name, icon });
+      this.toast.success(`Category "${name}" updated.`);
+    } else {
+      const created = this.categoryService.addCategory({
+        label: name,
+        icon,
+        type: this.isIncome() ? 'INCOME' : 'EXPENSE',
+      });
+      this.setCategory(created.value);
+      this.toast.success(`Category "${name}" added.`);
+    }
+
+    this.closeCategoryModal();
+  }
+
+  protected resetCategory(category: CategoryMeta, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.categoryService.resetCategory(category.value);
+    const originalName = category.originalLabel || category.label;
+    this.toast.success(`Category "${originalName}" reset to default.`);
+    if (this.editingCategory()?.value === category.value) {
+      this.categoryNameInput.set(category.originalLabel || category.label);
+      this.categoryIconInput.set(category.originalIcon || category.icon);
+    }
+  }
+
+  protected deleteCategory(targetValue?: string, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
+    const catValue = targetValue ?? this.editingCategory()?.value;
+    if (!catValue) return;
+
+    const meta = this.categoryService.categoryMeta(catValue);
+    this.categoryService.deleteCategory(catValue);
+    if (this.form.controls.category.value === catValue) {
+      const fallback = this.categories()[0]?.value ?? 'OTHER';
+      this.setCategory(fallback);
+    }
+    this.toast.success(`Category "${meta.label}" removed.`);
+    if (this.editingCategory()?.value === catValue) {
+      this.closeCategoryModal();
+    }
+  }
+
+  protected restoreAllDefaultCategories(): void {
+    this.categoryService.restoreAllDefaults();
+    this.toast.success('All default categories restored.');
   }
 
   ngOnInit(): void {

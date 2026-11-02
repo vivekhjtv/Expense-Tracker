@@ -221,4 +221,82 @@ describe('Milk', () => {
       expect(milk.remove).not.toHaveBeenCalled();
     });
   });
+
+  describe('milk price per litre', () => {
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    it('defaults to null when no price is stored', async () => {
+      await setup();
+      expect(component.pricePerLitre()).toBeNull();
+      expect(component.totalPrice()).toBe(0);
+    });
+
+    it('reads stored price from localStorage on init', async () => {
+      localStorage.setItem('expense-tracker.milk-price-per-litre', '60');
+      await setup([entry(TODAY_KEY, 2)]);
+      expect(component.pricePerLitre()).toBe(60);
+      expect(component.totalPrice()).toBe(120);
+    });
+
+    it('saves a valid price to signal and localStorage', async () => {
+      await setup([entry(TODAY_KEY, 1.5)]);
+      component.startEditingPrice();
+      expect(component.isEditingPrice()).toBe(true);
+
+      component.priceInput.set('65');
+      component.savePrice();
+
+      expect(component.pricePerLitre()).toBe(65);
+      expect(localStorage.getItem('expense-tracker.milk-price-per-litre')).toBe('65');
+      expect(component.isEditingPrice()).toBe(false);
+      expect(component.totalPrice()).toBe(97.5);
+    });
+
+    it('rejects invalid or zero price', async () => {
+      await setup();
+      component.priceInput.set('-10');
+      component.savePrice();
+      expect(component.pricePerLitre()).toBeNull();
+
+      component.priceInput.set('abc');
+      component.savePrice();
+      expect(component.pricePerLitre()).toBeNull();
+    });
+
+    it('automatically recalculates total price when month changes', async () => {
+      localStorage.setItem('expense-tracker.milk-price-per-litre', '50');
+      milk = {
+        month: vi.fn((m: string) => of(monthOf(m === THIS_MONTH ? [entry(TODAY_KEY, 2)] : [], m))),
+        save: vi.fn((date: string, quantity: number) => of(entry(date, quantity))),
+        remove: vi.fn(() => of({ message: 'ok' })),
+      };
+
+      await TestBed.configureTestingModule({
+        imports: [Milk],
+        providers: [
+          provideZonelessChangeDetection(),
+          provideRouter([]),
+          { provide: MilkService, useValue: milk },
+        ],
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(Milk);
+      component = fixture.componentInstance;
+      await settle();
+
+      expect(component.totalPrice()).toBe(100);
+
+      // Paging back to empty month updates totalPrice to 0
+      component.prevMonth();
+      await settle();
+      expect(component.totalPrice()).toBe(0);
+
+      // Paging forward back to this month restores totalPrice
+      component.nextMonth();
+      await settle();
+      expect(component.totalPrice()).toBe(100);
+    });
+  });
 });

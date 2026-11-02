@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { BusEntry, BusEntryDocument } from './schemas/bus-entry.schema';
 import { MilkEntry, MilkEntryDocument } from './schemas/milk-entry.schema';
 import { Transaction, TransactionDocument } from './schemas/transaction.schema';
 
@@ -20,6 +21,7 @@ export class IndexInitializer implements OnApplicationBootstrap {
   constructor(
     @InjectModel(Transaction.name) private readonly transactionModel: Model<TransactionDocument>,
     @InjectModel(MilkEntry.name) private readonly milkModel: Model<MilkEntryDocument>,
+    @InjectModel(BusEntry.name) private readonly busModel: Model<BusEntryDocument>,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -27,9 +29,10 @@ export class IndexInitializer implements OnApplicationBootstrap {
     try {
       await Promise.all([
         this.transactionModel.createIndexes(),
-        // The milk log's (userId, date) index is UNIQUE — it is what keeps a
-        // day to a single quantity, so it has to exist before the first write.
+        // The milk log's (userId, date) index is UNIQUE
         this.milkModel.createIndexes(),
+        // The bus log's (userId, date) index is UNIQUE
+        this.busModel.createIndexes(),
       ]);
       this.logger.log(`Indexes ready in ${Date.now() - started}ms`);
     } catch (err) {

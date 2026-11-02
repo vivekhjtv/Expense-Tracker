@@ -8,7 +8,17 @@
 
 <app-header
   title="Milk"
-  [subtitle]="summary() ? summary()!.totalLitres + ' L in ' + monthLabel() : null"
+  [subtitle]="
+    summary()
+      ? summary()!.totalLitres +
+        ' L' +
+        (pricePerLitre() && totalPrice() > 0
+          ? ' · ' + (totalPrice() | inr: (totalPrice() % 1 !== 0))
+          : '') +
+        ' in ' +
+        monthLabel()
+      : null
+  "
   [showThemeToggle]="true"
 />
 
@@ -154,10 +164,132 @@
             <dd class="money text-base font-bold text-fg">{{ stats.daysRecorded }}</dd>
           </div>
           <div>
-            <dt class="text-[10px] font-bold tracking-wide text-fg-subtle uppercase">Average</dt>
-            <dd class="money text-base font-bold text-fg">{{ stats.averageLitres }} L</dd>
+            <dt class="text-[10px] font-bold tracking-wide text-fg-subtle uppercase">Total Price</dt>
+            <dd class="money text-base font-bold" [class]="pricePerLitre() ? 'text-accent-fg' : 'text-fg-subtle'">
+              @if (pricePerLitre()) {
+                {{ totalPrice() | inr: (totalPrice() % 1 !== 0) }}
+              } @else {
+                <button
+                  type="button"
+                  (click)="startEditingPrice()"
+                  class="tap inline-flex items-center gap-1 rounded-md bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent-fg transition hover:opacity-90 active:opacity-75"
+                >
+                  <app-icon name="plus" [size]="12" />
+                  <span>Set rate</span>
+                </button>
+              }
+            </dd>
           </div>
         </dl>
+      }
+
+      <!-- Milk price rate setting and display -->
+      @if (isEditingPrice() || pricePerLitre() === null) {
+        <div class="mt-3.5 rounded-xl border border-line bg-sunken p-3.5">
+          <div class="mb-2 flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <app-icon name="milk" [size]="15" class="text-accent-fg" />
+              <span class="text-xs font-bold text-fg">Milk rate per litre</span>
+            </div>
+            @if (pricePerLitre() !== null) {
+              <button
+                type="button"
+                (click)="cancelEditingPrice()"
+                class="tap text-xs font-semibold text-fg-subtle hover:text-fg"
+              >
+                Cancel
+              </button>
+            }
+          </div>
+
+          <div class="space-y-2.5">
+            <div
+              class="relative flex items-center rounded-xl border border-line bg-card focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20"
+            >
+              <span class="pl-3.5 text-base font-bold text-fg-subtle select-none">&#8377;</span>
+              <input
+                id="milk-price-input"
+                type="number"
+                inputmode="decimal"
+                step="0.5"
+                min="1"
+                [value]="priceInput()"
+                (input)="onPriceInput($event)"
+                (keydown.enter)="savePrice()"
+                placeholder="Enter price (e.g. 60)"
+                class="w-full border-0 bg-transparent py-2.5 pr-12 pl-2 text-sm font-bold text-fg outline-none placeholder:font-normal placeholder:text-fg-subtle"
+              />
+              <span class="pr-3.5 text-xs font-medium text-fg-subtle select-none">/ L</span>
+            </div>
+
+            <!-- Quick price presets: ₹50, ₹60, ₹65, ₹70 -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] font-semibold text-fg-subtle uppercase">Quick:</span>
+              @for (preset of [50, 60, 65, 70]; track preset) {
+                <button
+                  type="button"
+                  (click)="setQuickPrice(preset)"
+                  class="tap rounded-lg border border-line bg-card px-2.5 py-1 text-xs font-medium text-fg-muted hover:border-accent hover:text-fg active:bg-sunken"
+                >
+                  &#8377;{{ preset }}
+                </button>
+              }
+            </div>
+
+            <div class="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                (click)="savePrice()"
+                [disabled]="!isPriceInputValid()"
+                class="tap flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold transition"
+                [class]="
+                  isPriceInputValid()
+                    ? 'bg-accent text-accent-ink shadow-sm active:scale-[0.98]'
+                    : 'bg-accent/40 text-accent-ink/60 cursor-not-allowed'
+                "
+              >
+                <app-icon name="check" [size]="14" />
+                <span>Save rate</span>
+              </button>
+              @if (pricePerLitre() !== null) {
+                <button
+                  type="button"
+                  (click)="cancelEditingPrice()"
+                  class="tap rounded-xl border border-line bg-card px-4 py-2.5 text-xs font-semibold text-fg-muted hover:text-fg active:bg-hover"
+                >
+                  Cancel
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      } @else {
+        <div class="mt-3.5 flex items-center justify-between rounded-xl bg-sunken px-3.5 py-2.5">
+          <div class="flex items-center gap-2.5">
+            <span
+              class="flex size-7 items-center justify-center rounded-lg bg-accent-soft text-accent-fg font-bold text-xs"
+            >
+              &#8377;
+            </span>
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-fg-subtle">
+                Milk Rate
+              </p>
+              <p class="text-sm font-bold text-fg">
+                &#8377;{{ pricePerLitre() }}
+                <span class="text-xs font-normal text-fg-subtle">/ litre</span>
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            (click)="startEditingPrice()"
+            class="tap flex items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-hover active:bg-sunken"
+          >
+            <app-icon name="pencil" [size]="13" />
+            <span>Edit rate</span>
+          </button>
+        </div>
       }
 
       @if (!isCurrentMonth()) {

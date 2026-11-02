@@ -20,11 +20,13 @@ export type IconName =
   | 'logout'
   | 'cash'
   | 'milk'
+  | 'bus'
   | 'phone'
   | 'sparkle'
   | 'alert'
   | 'calendar'
-  | 'user';
+  | 'user'
+  | 'history';
 
 /**
  * Icon set.
@@ -143,6 +145,11 @@ export type IconName =
           <path d="M6.5 8.5h11V20a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" />
           <path d="M9.5 13h5" />
         }
+        @case ('bus') {
+          <path d="M8 6v6M16 6v6M2 12h20M7 19H4a2 2 0 0 1-2-2V7a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2h-3" />
+          <circle cx="6.5" cy="18.5" r="2.5" />
+          <circle cx="17.5" cy="18.5" r="2.5" />
+        }
         @case ('phone') {
           <rect x="6" y="2" width="12" height="20" rx="2.5" />
           <path d="M11 18h2" />
@@ -162,6 +169,11 @@ export type IconName =
         @case ('user') {
           <circle cx="12" cy="8" r="4" />
           <path d="M4 21a8 8 0 0 1 16 0" />
+        }
+        @case ('history') {
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+          <path d="M12 7v5l4 2" />
         }
       }
     </svg>

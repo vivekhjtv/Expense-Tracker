@@ -6,6 +6,7 @@ import { MilkService } from '../../core/services/milk.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AppHeader } from '../../shared/components/app-header/app-header';
 import { Icon } from '../../shared/components/icon/icon';
+import { InrPipe } from '../../shared/pipes/inr.pipe';
 
 /** One square in the month grid. `null` pads the week before the 1st. */
 export interface DayCell {
@@ -17,6 +18,7 @@ export interface DayCell {
 }
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
+const MILK_PRICE_STORAGE_KEY = 'expense-tracker.milk-price-per-litre';
 
 /** Local calendar day as YYYY-MM-DD — the same shape the API stores. */
 function dayKey(date: Date): string {
@@ -44,13 +46,17 @@ function shiftMonth(month: string, delta: number): string {
  */
 @Component({
   selector: 'app-milk',
-  imports: [AppHeader, Icon],
+  imports: [AppHeader, Icon, InrPipe],
   templateUrl: './milk.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Milk {
   private readonly milkService = inject(MilkService);
   private readonly toast = inject(ToastService);
+
+  protected readonly pricePerLitre = signal<number | null>(this.readStoredPrice());
+  protected readonly isEditingPrice = signal(false);
+  protected readonly priceInput = signal('');
 
   protected readonly quantities = MILK_QUANTITIES;
   protected readonly weekdays = WEEKDAYS;
@@ -83,6 +89,19 @@ export class Milk {
 
   protected readonly loading = computed(() => this.result() === null && !this.failed());
   protected readonly summary = computed(() => this.result()?.summary ?? null);
+
+  /** Total milk price calculated dynamically for the loaded month. */
+  protected readonly totalPrice = computed(() => {
+    const rate = this.pricePerLitre();
+    const litres = this.summary()?.totalLitres ?? 0;
+    if (rate === null || rate <= 0 || litres <= 0) return 0;
+    return Math.round(litres * rate * 100) / 100;
+  });
+
+  protected readonly isPriceInputValid = computed(() => {
+    const val = parseFloat(this.priceInput().trim());
+    return !Number.isNaN(val) && val > 0;
+  });
 
   /** Day -> litres, so a cell is a lookup rather than a scan of the month. */
   private readonly byDate = computed(() => {
@@ -247,5 +266,56 @@ export class Milk {
   protected goToThisMonth(): void {
     this.month.set(this.currentMonth);
     this.selectedDate.set(this.today);
+  }
+
+  private readStoredPrice(): number | null {
+    try {
+      const stored = localStorage.getItem(MILK_PRICE_STORAGE_KEY);
+      if (stored !== null) {
+        const parsed = parseFloat(stored);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          return parsed;
+        }
+      }
+    } catch {
+      // localStorage may fail in restricted/private contexts
+    }
+    return null;
+  }
+
+  protected startEditingPrice(): void {
+    const current = this.pricePerLitre();
+    this.priceInput.set(current !== null ? String(current) : '');
+    this.isEditingPrice.set(true);
+  }
+
+  protected cancelEditingPrice(): void {
+    this.isEditingPrice.set(false);
+  }
+
+  protected onPriceInput(event: Event): void {
+    this.priceInput.set((event.target as HTMLInputElement).value);
+  }
+
+  protected setQuickPrice(preset: number): void {
+    this.priceInput.set(String(preset));
+  }
+
+  protected savePrice(): void {
+    const parsed = parseFloat(this.priceInput().trim());
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      this.toast.error('Please enter a valid price greater than 0.');
+      return;
+    }
+
+    const rounded = Math.round(parsed * 100) / 100;
+    this.pricePerLitre.set(rounded);
+    try {
+      localStorage.setItem(MILK_PRICE_STORAGE_KEY, String(rounded));
+    } catch {
+      // ignore
+    }
+    this.isEditingPrice.set(false);
+    this.toast.success(`Milk rate saved: ₹${rounded} / L`);
   }
 }

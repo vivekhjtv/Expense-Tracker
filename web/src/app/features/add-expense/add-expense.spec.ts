@@ -226,5 +226,39 @@ describe('AddExpense', () => {
       expect(date).toMatch(/^\d{4}-\d{2}-\d{2}T/);
       expect(new Date(date).getDate()).toBe(3);
     });
+
+    it('opens category list manager modal and supports search and editing', () => {
+      expect(component.isCategoryListModalOpen()).toBe(false);
+
+      component.openCategoryListModal();
+      expect(component.isCategoryListModalOpen()).toBe(true);
+
+      // Filter by search
+      component.categorySearchQuery.set('Grocer');
+      expect(component.filteredCategoriesForManager().length).toBe(1);
+      expect(component.filteredCategoriesForManager()[0].value).toBe('GROCERIES');
+
+      // Edit a category
+      const target = component.filteredCategoriesForManager()[0];
+      component.startEditingCategory(target);
+      expect(component.isCategoryModalOpen()).toBe(true);
+      expect(component.categoryNameInput()).toBe('Groceries');
+
+      // Modify and save
+      component.categoryNameInput.set('Kirana Store');
+      component.categoryIconInput.set('🥦');
+      component.saveCategory();
+
+      expect(component.isCategoryModalOpen()).toBe(false);
+      const updated = component.categories().find((c: any) => c.value === 'GROCERIES');
+      expect(updated.label).toBe('Kirana Store');
+      expect(updated.icon).toBe('🥦');
+
+      // Reset back
+      component.resetCategory(updated);
+      const reset = component.categories().find((c: any) => c.value === 'GROCERIES');
+      expect(reset.label).toBe('Groceries');
+      expect(reset.icon).toBe('🛒');
+    });
   });
 });

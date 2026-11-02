@@ -13,15 +13,16 @@ import {
   switchMap,
 } from 'rxjs';
 import {
+  CategoryMeta,
   categoryMeta,
   DateRangePreset,
   PaymentMode,
   TransactionType,
 } from '../../core/models/enums';
 import { Paginated, Transaction } from '../../core/models/transaction.model';
+import { CategoryService } from '../../core/services/category.service';
 import { ToastService } from '../../core/services/toast.service';
 import { TransactionQuery, TransactionService } from '../../core/services/transaction.service';
-import { EXPENSE_CATEGORIES } from '../../core/models/enums';
 import { toIsoFromDateInput } from '../../core/utils/date.util';
 import { InrPipe } from '../../shared/pipes/inr.pipe';
 import { AppHeader } from '../../shared/components/app-header/app-header';
@@ -61,10 +62,13 @@ const RANGES = [
 export class Transactions {
   private readonly fb = inject(FormBuilder);
   private readonly transactionService = inject(TransactionService);
+  private readonly categoryService = inject(CategoryService);
   private readonly toast = inject(ToastService);
 
   protected readonly ranges = RANGES;
-  protected readonly allCategories = EXPENSE_CATEGORIES;
+  protected get allCategories(): readonly CategoryMeta[] {
+    return this.categoryService.expenseCategories();
+  }
   protected readonly PaymentMode = PaymentMode;
   protected readonly DateRangePreset = DateRangePreset;
 

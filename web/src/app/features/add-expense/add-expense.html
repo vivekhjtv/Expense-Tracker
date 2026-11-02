@@ -234,9 +234,19 @@
 
   <!-- Category ------------------------------------------------------- -->
   <div class="card p-4">
-    <span class="label" id="category-label">Category</span>
-    <!-- A wrapping chip grid rather than a <select>: it shows every option
-         at once and each chip is its own large tap target. -->
+    <div class="mb-2.5 flex items-center justify-between">
+      <span class="label mb-0" id="category-label">Category</span>
+      <button
+        type="button"
+        (click)="openCategoryListModal()"
+        class="tap flex items-center gap-1 rounded-lg border border-line bg-sunken px-2.5 py-1 text-xs font-semibold text-fg-muted transition hover:border-line-strong hover:text-fg active:bg-hover"
+      >
+        <app-icon name="pencil" [size]="12" />
+        <span>Edit</span>
+      </button>
+    </div>
+
+    <!-- Clean wrapping chip grid with NO edit icon inside chips -->
     <div class="flex flex-wrap gap-2" role="group" aria-labelledby="category-label">
       @for (option of categories(); track option.value) {
         <button
@@ -246,10 +256,19 @@
           class="chip px-3"
           [class.chip-accent]="form.controls.category.value === option.value"
         >
-          <span aria-hidden="true">{{ option.icon }}</span
-          >{{ option.label }}
+          <span aria-hidden="true">{{ option.icon }}</span>
+          <span>{{ option.label }}</span>
         </button>
       }
+
+      <button
+        type="button"
+        (click)="openAddCategory()"
+        class="chip border-dashed border-line-strong px-3 text-accent-fg active:bg-hover"
+      >
+        <app-icon name="plus" [size]="14" />
+        <span>Add</span>
+      </button>
     </div>
   </div>
 
@@ -458,3 +477,320 @@
     </div>
   </div>
 </form>
+
+<!-- Category Manager List Modal ------------------------------------ -->
+@if (isCategoryListModalOpen()) {
+  <div
+    class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-3 backdrop-blur-xs transition-opacity"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Manage categories"
+  >
+    <div
+      class="flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl border border-line bg-card p-4 shadow-2xl transition-all"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Modal header -->
+      <div class="mb-3 flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-fg">Manage Categories</h3>
+          <p class="text-xs text-fg-subtle">
+            Tap the pencil icon to edit any category's name or icon
+          </p>
+        </div>
+        <button
+          type="button"
+          (click)="closeCategoryListModal()"
+          aria-label="Close"
+          class="tap flex size-8 items-center justify-center rounded-lg text-fg-subtle hover:text-fg active:bg-hover"
+        >
+          <app-icon name="close" [size]="18" />
+        </button>
+      </div>
+
+      <!-- Search bar -->
+      <div class="relative mb-3">
+        <span class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-subtle">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          placeholder="Search categories…"
+          [value]="categorySearchQuery()"
+          (input)="categorySearchQuery.set($any($event.target).value)"
+          class="field py-2 pr-3 pl-9 text-xs"
+        />
+        @if (categorySearchQuery()) {
+          <button
+            type="button"
+            (click)="categorySearchQuery.set('')"
+            class="tap absolute top-1/2 right-2.5 -translate-y-1/2 text-fg-subtle hover:text-fg"
+          >
+            <app-icon name="close" [size]="14" />
+          </button>
+        }
+      </div>
+
+      <!-- Categories list -->
+      <div class="flex-1 overflow-y-auto space-y-1.5 pr-0.5 max-h-72">
+        @for (cat of filteredCategoriesForManager(); track cat.value) {
+          <div
+            class="flex items-center justify-between rounded-xl border border-line bg-sunken/60 px-3 py-2 transition hover:bg-sunken"
+          >
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-card text-lg shadow-xs">
+                {{ cat.icon }}
+              </span>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-fg">{{ cat.label }}</p>
+                <div class="flex items-center gap-1.5 text-[10px]">
+                  @if (cat.isCustom) {
+                    <span class="rounded bg-accent-soft px-1.5 py-0.5 font-bold text-accent-fg">
+                      Custom
+                    </span>
+                  } @else if (cat.isEdited) {
+                    <span class="rounded bg-warn-soft px-1.5 py-0.5 font-bold text-warn-fg">
+                      Edited (was {{ cat.originalLabel }})
+                    </span>
+                  } @else {
+                    <span class="text-fg-subtle">Default</span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <!-- Action buttons for each category in list -->
+            <div class="flex items-center gap-1 shrink-0 ml-2">
+              @if (cat.isEdited && !cat.isCustom) {
+                <button
+                  type="button"
+                  (click)="resetCategory(cat, $event)"
+                  title="Reset to default"
+                  [attr.aria-label]="'Reset ' + cat.label + ' to default'"
+                  class="tap flex size-8 items-center justify-center rounded-lg text-fg-subtle hover:text-warn active:bg-hover"
+                >
+                  <app-icon name="history" [size]="14" />
+                </button>
+              }
+
+              <!-- Delete button available for ALL categories (both default and custom) -->
+              <button
+                type="button"
+                (click)="deleteCategory(cat.value, $event)"
+                title="Delete category"
+                [attr.aria-label]="'Delete ' + cat.label"
+                class="tap flex size-8 items-center justify-center rounded-lg text-spend hover:bg-spend-soft active:opacity-75"
+              >
+                <app-icon name="trash" [size]="14" />
+              </button>
+
+              <button
+                type="button"
+                (click)="startEditingCategory(cat)"
+                title="Edit category"
+                [attr.aria-label]="'Edit ' + cat.label"
+                class="tap flex size-8 items-center justify-center rounded-lg bg-accent-soft text-accent-fg hover:bg-accent/20 active:opacity-75"
+              >
+                <app-icon name="pencil" [size]="13" />
+              </button>
+            </div>
+          </div>
+        } @empty {
+          <p class="py-6 text-center text-xs text-fg-subtle">No categories match your search.</p>
+        }
+      </div>
+
+      <!-- Optional Restore link if any defaults were deleted -->
+      @if (deletedCategoriesCount() > 0) {
+        <div class="mt-2 text-center">
+          <button
+            type="button"
+            (click)="restoreAllDefaultCategories()"
+            class="text-[11px] font-semibold text-accent-fg hover:underline"
+          >
+            &#x21BA; Restore {{ deletedCategoriesCount() }} deleted default {{
+              deletedCategoriesCount() === 1 ? 'category' : 'categories'
+            }}
+          </button>
+        </div>
+      }
+
+      <!-- Footer -->
+      <div class="mt-3.5 flex items-center gap-2 border-t border-line pt-3">
+        <button
+          type="button"
+          (click)="openAddCategory()"
+          class="tap flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed border-accent-line bg-accent-soft py-2.5 text-xs font-bold text-accent-fg active:opacity-80"
+        >
+          <app-icon name="plus" [size]="14" />
+          <span>New category</span>
+        </button>
+        <button
+          type="button"
+          (click)="closeCategoryListModal()"
+          class="tap rounded-xl bg-surface border border-line px-4 py-2.5 text-xs font-semibold text-fg active:bg-hover"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Add / Edit Category Modal -------------------------------------- -->
+@if (isCategoryModalOpen()) {
+  <div
+    class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-3 backdrop-blur-xs transition-opacity"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="editingCategory() ? 'Edit category' : 'Add category'"
+  >
+    <div
+      class="flex max-h-[90vh] w-full max-w-sm flex-col rounded-2xl border border-line bg-card p-4 shadow-2xl transition-all"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Modal header -->
+      <div class="mb-3 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="flex size-9 items-center justify-center rounded-xl bg-sunken text-xl">
+            {{ categoryIconInput() }}
+          </span>
+          <div>
+            <h3 class="text-sm font-bold text-fg">
+              {{ editingCategory() ? 'Edit Category' : 'Add New Category' }}
+            </h3>
+            <p class="text-[11px] text-fg-subtle">
+              {{ editingCategory() ? 'Customize name or icon' : 'Choose a name and an icon' }}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          (click)="closeCategoryModal()"
+          aria-label="Close"
+          class="tap flex size-8 items-center justify-center rounded-lg text-fg-subtle hover:text-fg active:bg-hover"
+        >
+          <app-icon name="close" [size]="18" />
+        </button>
+      </div>
+
+      <div class="space-y-3 flex-1 overflow-y-auto pr-0.5">
+        <!-- Name Input -->
+        <div>
+          <label for="cat-name-input" class="label mb-1.5 text-xs font-semibold">
+            Category Name
+          </label>
+          <input
+            id="cat-name-input"
+            type="text"
+            maxlength="40"
+            [value]="categoryNameInput()"
+            (input)="categoryNameInput.set($any($event.target).value)"
+            (keydown.enter)="isCategoryFormValid() ? saveCategory() : null"
+            placeholder="e.g. Gym, Pet Care, Freelance"
+            class="field py-2.5 text-sm"
+          />
+        </div>
+
+        <!-- Researched Icon Catalog Picker -->
+        <div>
+          <div class="mb-1.5 flex items-center justify-between">
+            <span class="label mb-0 text-xs font-semibold">Choose Icon</span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] text-fg-subtle">Custom:</span>
+              <input
+                type="text"
+                maxlength="4"
+                [value]="categoryIconInput()"
+                (input)="categoryIconInput.set($any($event.target).value || '🏷️')"
+                class="size-7 rounded-md border border-line bg-sunken text-center text-sm"
+                title="Type or paste custom emoji"
+              />
+            </div>
+          </div>
+
+          <!-- Category groups / tabs for icons -->
+          <div class="mb-2 flex gap-1 overflow-x-auto pb-1 text-xs">
+            <button
+              type="button"
+              (click)="selectedIconGroupId.set('popular')"
+              class="tap shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold transition"
+              [class]="selectedIconGroupId() === 'popular' ? 'bg-accent text-accent-ink' : 'bg-sunken text-fg-muted hover:text-fg'"
+            >
+              Popular
+            </button>
+            @for (group of iconGroups; track group.id) {
+              <button
+                type="button"
+                (click)="selectedIconGroupId.set(group.id)"
+                class="tap shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold transition"
+                [class]="selectedIconGroupId() === group.id ? 'bg-accent text-accent-ink' : 'bg-sunken text-fg-muted hover:text-fg'"
+              >
+                <span class="mr-0.5">{{ group.icon }}</span>
+                <span>{{ group.label }}</span>
+              </button>
+            }
+          </div>
+
+          <!-- Emoji Grid -->
+          <div class="grid grid-cols-8 gap-1 rounded-xl border border-line bg-sunken p-1.5 max-h-36 overflow-y-auto">
+            @for (emoji of activeIconList(); track emoji) {
+              <button
+                type="button"
+                (click)="selectEmoji(emoji)"
+                class="tap flex size-8 items-center justify-center rounded-lg text-base transition active:scale-95"
+                [class]="categoryIconInput() === emoji ? 'bg-accent/20 ring-2 ring-accent' : 'hover:bg-hover'"
+              >
+                {{ emoji }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="pt-2 space-y-2 border-t border-line">
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              (click)="saveCategory()"
+              [disabled]="!isCategoryFormValid()"
+              class="tap flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-accent py-2.5 text-xs font-bold text-accent-ink transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <app-icon name="check" [size]="14" />
+              <span>{{ editingCategory() ? 'Save changes' : 'Save category' }}</span>
+            </button>
+            <button
+              type="button"
+              (click)="closeCategoryModal()"
+              class="tap rounded-xl border border-line bg-card px-4 py-2.5 text-xs font-semibold text-fg-muted active:bg-hover"
+            >
+              Cancel
+            </button>
+          </div>
+
+          @if (editingCategory(); as editing) {
+            <button
+              type="button"
+              (click)="deleteCategory()"
+              class="tap flex w-full items-center justify-center gap-1.5 rounded-xl border border-spend-line bg-spend-soft py-2 text-xs font-semibold text-spend-fg active:opacity-75"
+            >
+              <app-icon name="trash" [size]="13" />
+              <span>Delete category</span>
+            </button>
+
+            @if (editing.isEdited && !editing.isCustom) {
+              <button
+                type="button"
+                (click)="resetCategory(editing)"
+                class="tap flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-sunken py-2 text-xs font-semibold text-fg-muted active:bg-hover"
+              >
+                <app-icon name="history" [size]="13" />
+                <span>Reset to original ({{ editing.originalLabel }})</span>
+              </button>
+            }
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+}

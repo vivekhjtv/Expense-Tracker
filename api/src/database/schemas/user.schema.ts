@@ -30,5 +30,4 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// Emails are stored lowercase, so this also enforces case-insensitive uniqueness.
-UserSchema.index({ email: 1 }, { unique: true });
+

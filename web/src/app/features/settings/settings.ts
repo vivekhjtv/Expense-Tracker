@@ -111,5 +111,6 @@ export class Settings {
     },
     { path: '/', label: 'Dashboard', icon: 'chart', hint: 'Charts and totals' },
     { path: '/milk', label: 'Milk log', icon: 'milk', hint: 'How much milk, day by day' },
+    { path: '/bus', label: 'Bus log', icon: 'bus', hint: 'Bus ticket spending & calendar' },
   ];
 }

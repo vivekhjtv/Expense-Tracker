@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { IndexInitializer } from './index-initializer.service';
 import { MilkEntry, MilkEntrySchema } from './schemas/milk-entry.schema';
+import { BusEntry, BusEntrySchema } from './schemas/bus-entry.schema';
 import { Transaction, TransactionSchema } from './schemas/transaction.schema';
 
 const logger = new Logger('Database');
@@ -26,8 +27,13 @@ const logger = new Logger('Database');
         uri: config.getOrThrow<string>('database.uri'),
         // Fail fast rather than buffering writes forever behind a dead socket.
         serverSelectionTimeoutMS: 10_000,
-        maxPoolSize: 20,
+        connectTimeoutMS: 15_000,
+        socketTimeoutMS: 45_000,
+        maxPoolSize: 10,
+        minPoolSize: 1,
+        family: 4,
         retryWrites: true,
+        retryReads: true,
         // Off deliberately — IndexInitializer builds them, awaited, before
         // the server accepts traffic. See that file for why.
         autoIndex: false,
@@ -44,6 +50,7 @@ const logger = new Logger('Database');
     MongooseModule.forFeature([
       { name: Transaction.name, schema: TransactionSchema },
       { name: MilkEntry.name, schema: MilkEntrySchema },
+      { name: BusEntry.name, schema: BusEntrySchema },
     ]),
   ],
   providers: [IndexInitializer],
